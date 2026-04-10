@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ===== DEFAULT SEO (sẽ bị override bởi react-helmet) ===== -->
+    <meta
+      name="description"
+      content="Cửa hàng laptop, PC, phụ kiện công nghệ chính hãng. Giá tốt nhất, bảo hành 12 tháng."
+    />
+    <meta
+      name="keywords"
+      content="laptop, pc, máy tính, phụ kiện, công nghệ, tech geeks"
+    />
+    <meta name="author" content="Tech-Geeks" />
+
+    <!-- ===== PRECONNECT TO EXTERNAL DOMAINS ===== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- ===== PRELOAD CRITICAL IMAGES ===== -->
+    <!-- Preload logo và các ảnh quan trọng hiển thị ngay -->
+    <link rel="preload" as="image" href="/logo.png" />
+    <link rel="preload" as="image" href="/placeholder-blur.svg" />
+
+    <title>Tech-Geeks - Cửa hàng laptop, PC chính hãng</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
