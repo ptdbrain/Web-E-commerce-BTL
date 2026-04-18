@@ -1,0 +1,154 @@
+/* ================================
+   PRODUCT CARD SKELETON
+   ================================ */
+.product-card-skeleton {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Skeleton Image */
+.skeleton-image {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Skeleton Content */
+.skeleton-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Skeleton Title */
+.skeleton-title {
+  height: 20px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  width: 85%;
+}
+
+/* Skeleton Specs */
+.skeleton-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-spec-line {
+  height: 14px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+}
+
+.skeleton-spec-line:nth-child(1) {
+  width: 90%;
+}
+
+.skeleton-spec-line:nth-child(2) {
+  width: 75%;
+  animation-delay: 0.1s;
+}
+
+.skeleton-spec-line:nth-child(3) {
+  width: 80%;
+  animation-delay: 0.2s;
+}
+
+/* Skeleton Price */
+.skeleton-price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.skeleton-price-main {
+  height: 24px;
+  width: 100px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-price-old {
+  height: 16px;
+  width: 80px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+}
+
+/* Skeleton Actions */
+.skeleton-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skeleton-btn {
+  height: 40px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+.skeleton-btn-primary {
+  flex: 1;
+}
+
+/* ================================
+   RESPONSIVE
+   ================================ */
+@media (max-width: 768px) {
+  .skeleton-image {
+    height: 180px;
+  }
+
+  .skeleton-content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .skeleton-image {
+    height: 160px;
+  }
+
+  .skeleton-content {
+    padding: 10px;
+    gap: 10px;
+  }
+}

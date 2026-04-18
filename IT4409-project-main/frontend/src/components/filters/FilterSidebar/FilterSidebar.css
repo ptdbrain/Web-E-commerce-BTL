@@ -1,0 +1,355 @@
+/* ================================
+   FILTER SIDEBAR - MAIN CONTAINER
+   ================================ */
+ .filter-sidebar {
+  width: 260px;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  padding: 20px 16px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  border-radius: 16px;
+}
+
+/* ================================
+   SCROLLBAR STYLING
+   ================================ */
+.filter-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-sidebar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.filter-sidebar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.filter-sidebar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ================================
+   FILTER HEADER
+   ================================ */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.filter-main-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.clear-all-btn {
+  font-size: 13px;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.clear-all-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ================================
+   FILTER CONTENT
+   ================================ */
+.filter-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ================================
+   FILTER SECTION
+   ================================ */
+.filter-section {
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
+}
+
+.filter-section:last-child {
+  border-bottom: none;
+}
+
+.filter-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+
+/* ================================
+   FILTER OPTIONS
+   ================================ */
+ .filter-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+/* ================================
+   CHECKBOX FILTER
+   ================================ */
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.filter-checkbox:hover {
+  background: #f9fafb;
+}
+
+.filter-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.filter-checkbox span {
+  flex: 1;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ================================
+   NESTED FILTER (CPU)
+   ================================ */
+.nested-filter {
+  gap: 4px;
+}
+
+.filter-category {
+  margin-bottom: 8px;
+}
+
+.filter-category-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.filter-category-header:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.category-name {
+  flex: 1;
+  text-align: left;
+}
+
+.category-icon {
+  font-size: 16px;
+  color: #6b7280;
+  font-weight: bold;
+}
+
+.filter-category-items {
+  margin-top: 8px;
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-checkbox.nested {
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+/* ================================
+   TOGGLE BUTTON
+   ================================ */
+.filter-toggle-btn {
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 4px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-toggle-btn:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* ================================
+   PRICE RANGE FILTER
+   ================================ */
+.custom-price-input {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.price-input-label {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.price-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.price-input {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.price-input:focus {
+  outline: none;
+  border-color: #0066cc;
+}
+
+.price-input::placeholder {
+  color: #999;
+}
+
+.price-separator {
+  color: #999;
+  font-weight: 500;
+}
+
+.price-input-unit {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+.price-apply-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: #0066cc;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.price-apply-btn:hover {
+  background: #0052a3;
+}
+
+/* ================================
+   FILTER FOOTER
+   ================================ */
+.filter-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 2px solid #f1f5f9;
+}
+
+.clear-footer-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.clear-footer-btn:hover {
+  background: #fecaca;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);
+}
+
+/* ================================
+   RESPONSIVE
+   ================================ */
+@media (max-width: 1024px) {
+  .filter-sidebar {
+    width: 220px;
+    padding: 16px 12px;
+  }
+
+  .filter-main-title {
+    font-size: 16px;
+  }
+
+  .filter-checkbox {
+    font-size: 12px;
+    padding: 5px 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .filter-sidebar.open {
+    left: 0;
+  }
+}
