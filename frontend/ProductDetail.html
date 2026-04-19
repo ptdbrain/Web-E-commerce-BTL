@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chi tiết sản phẩm - Tech-Geeks</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="product-detail.css" />
+</head>
+
+<body>
+    <header>
+        <h1>Tech-Geeks</h1>
+        <nav>
+            <a href="index.html">Trang chủ</a>
+            <a href="#">Sản phẩm</a>
+            <a href="cart.html">Giỏ hàng</a>
+        </nav>
+    </header>
+
+    <main class="detail-container">
+        <div class="detail-image">
+            <img src="https://placehold.co/400x300" alt="Laptop Dell XPS 15" />
+        </div>
+
+        <div class="detail-info">
+            <h2>Laptop Dell XPS 15</h2>
+            <p class="price">25.990.000 đ</p>
+
+            <ul class="specs">
+                <li>CPU: Intel Core i7-13700H</li>
+                <li>RAM: 16GB DDR5</li>
+                <li>Ổ cứng: 512GB SSD</li>
+                <li>Màn hình: 15.6" FHD 120Hz</li>
+                <li>GPU: NVIDIA RTX 4060</li>
+            </ul>
+
+            <div class="quantity">
+                <label>Số lượng:</label>
+                <button onclick="changeQty(-1)">-</button>
+                <span id="qty">1</span>
+                <button onclick="changeQty(1)">+</button>
+            </div>
+
+            <div class="actions">
+                <button class="btn-cart">Thêm vào giỏ hàng</button>
+                <button class="btn-buy">Mua ngay</button>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2024 Tech-Geeks</p>
+    </footer>
+
+    <script>
+        function changeQty(delta) {
+            const el = document.getElementById("qty");
+            const current = parseInt(el.textContent);
+            if (current + delta >= 1) el.textContent = current + delta;
+        }
+    </script>
+</body>
+
+</html>
