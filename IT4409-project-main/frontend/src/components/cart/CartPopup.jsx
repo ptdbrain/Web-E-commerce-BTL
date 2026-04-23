@@ -11,6 +11,7 @@ export function CartPopup() {
     isCartOpen,
     setIsCartOpen,
     addToCart,
+    decreaseQuantity,
     removeFromCart,
     selectedItemIds,
     setSelectedItemIds,
@@ -30,7 +31,7 @@ export function CartPopup() {
     setIsCartOpen(false);
     setIsManualSelection(false);
     setSelectedItemIds([]);
-    setDirectCheckoutItems(null);
+    setDirectCheckoutItems([]);
     navigate("/checkout");
   };
 
@@ -136,7 +137,7 @@ export function CartPopup() {
                               onClick={() =>
                                 item.quantity <= 1
                                   ? removeFromCart(item.cartKey || item.id)
-                                  : addToCart({ ...item, quantity: -1 })
+                                  : decreaseQuantity(item.cartKey || item.id)
                               }
                               className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
                             >

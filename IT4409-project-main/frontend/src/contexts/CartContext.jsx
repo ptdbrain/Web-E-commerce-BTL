@@ -1,12 +1,31 @@
-import React, { createContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
-import { buildApiUrl } from "../config/api";
+
 import {
-  buildCartItemKey,
-  calculateConfiguredUnitPrice,
-} from "../utils/cartItem";
+  addCartItem as addCartItemRequest,
+  fetchCart,
+  removeCartItem as removeCartItemRequest,
+  updateCartItemQuantity as updateCartItemQuantityRequest,
+} from "../api/cartApi.js";
+import { buildApiUrl } from "../config/api.js";
+import { calculateCheckoutTotals } from "../utils/checkoutPricing.js";
+import { buildCartItemKey, calculateConfiguredUnitPrice } from "../utils/cartItem.js";
+import {
+  buildCartApiItemPayload,
+  buildOrderItemPayload,
+  getItemBasePrice,
+  mapServerCartItem,
+} from "../utils/cartPayload.js";
 
 export const CartContext = createContext();
+
+const getStoredToken = () => localStorage.getItem("token") || "";
 
 const createDefaultFormData = () => ({
   name: "",
@@ -19,18 +38,75 @@ const createDefaultFormData = () => ({
   contactNote: "",
 });
 
-const normalizeCartItem = (item) => {
+const readStoredCartItems = () => {
+  try {
+    const savedCart = JSON.parse(localStorage.getItem("cartItems") || "[]");
+    return Array.isArray(savedCart) ? savedCart : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeCartItem = (item = {}) => {
+  if (item.productId || item.productName) {
+    return mapServerCartItem(item);
+  }
+
+  const id = String(item.id || item.productId || item._id || "");
+  const basePrice = getItemBasePrice(item);
+  const selectedAddons = Array.isArray(item.selectedAddons)
+    ? item.selectedAddons
+    : [];
+  const selectedSize = item.selectedSize || null;
   const configuredUnitPrice =
-    item.configuredUnitPrice ?? calculateConfiguredUnitPrice(item);
+    item.configuredUnitPrice ??
+    item.unitPrice ??
+    calculateConfiguredUnitPrice({
+      ...item,
+      newPrice: basePrice,
+      selectedAddons,
+      selectedSize,
+    });
 
   return {
     ...item,
+    id,
+    _id: id,
     quantity: Math.max(1, Number(item.quantity || 1)),
     imageUrl: item.imageUrl || item.image || item.thumbnail || "",
-    newPrice: item.newPrice ?? item.price ?? configuredUnitPrice,
+    image: item.image || item.imageUrl || item.thumbnail || "",
+    basePrice,
+    newPrice: basePrice,
     configuredUnitPrice,
-    cartKey: item.cartKey || buildCartItemKey(item),
+    selectedSize,
+    selectedAddons,
+    itemNote: String(item.itemNote || item.note || "").trim(),
+    cartKey: item.cartKey || buildCartItemKey({ ...item, id }),
   };
+};
+
+const mergeLocalCartItems = (items = [], incomingItem) => {
+  const nextItem = normalizeCartItem(incomingItem);
+  const existingItem = items.find((item) => item.cartKey === nextItem.cartKey);
+
+  if (!existingItem) {
+    return [...items, nextItem];
+  }
+
+  const nextQuantity = existingItem.quantity + nextItem.quantity;
+  if (nextQuantity <= 0) {
+    return items.filter((item) => item.cartKey !== nextItem.cartKey);
+  }
+
+  return items.map((item) =>
+    item.cartKey === nextItem.cartKey
+      ? normalizeCartItem({
+          ...existingItem,
+          ...nextItem,
+          quantity: nextQuantity,
+        })
+      : item
+  );
 };
 
 const mapOrderForState = (order) => ({
@@ -49,8 +125,9 @@ const mapOrderForState = (order) => ({
         name: item.productName,
         imageUrl: item.productImage,
         quantity: item.quantity,
+        basePrice: item.basePrice ?? item.price,
         configuredUnitPrice: item.unitPrice || item.price,
-        newPrice: item.price,
+        newPrice: item.basePrice ?? item.price,
         selectedSize: item.selectedSize,
         selectedAddons: item.selectedAddons || [],
         itemNote: item.itemNote,
@@ -59,14 +136,10 @@ const mapOrderForState = (order) => ({
 });
 
 export function CartProvider({ children }) {
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const savedCart = JSON.parse(localStorage.getItem("cartItems") || "[]");
-      return Array.isArray(savedCart) ? savedCart.map(normalizeCartItem) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [authToken, setAuthToken] = useState(getStoredToken);
+  const [cartItems, setCartItems] = useState(() =>
+    readStoredCartItems().map(normalizeCartItem)
+  );
   const [formData, setFormData] = useState(createDefaultFormData);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -87,10 +160,107 @@ export function CartProvider({ children }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [orders, setOrders] = useState([]);
+  const authTokenRef = useRef(authToken);
+  const cartItemsRef = useRef(cartItems);
+  const guestCartSnapshotRef = useRef([]);
+
+  const applyServerCart = useCallback((cart) => {
+    const nextItems = Array.isArray(cart?.items)
+      ? cart.items.map(mapServerCartItem)
+      : [];
+    setCartItems(nextItems);
+  }, []);
+
+  const syncCartFromServer = useCallback(
+    async (guestItems = []) => {
+      if (!authToken) return;
+
+      try {
+        let remoteCart = await fetchCart(authToken);
+
+        for (const guestItem of guestItems.map(normalizeCartItem)) {
+          remoteCart = await addCartItemRequest(
+            authToken,
+            buildCartApiItemPayload(guestItem)
+          );
+        }
+
+        applyServerCart(remoteCart);
+      } catch (error) {
+        console.error("Error syncing cart from backend:", error);
+      }
+    },
+    [authToken, applyServerCart]
+  );
+
+  const removePurchasedCartItems = useCallback(
+    async (itemsToRemove = []) => {
+      const cartKeys = itemsToRemove
+        .map((item) => item.cartKey)
+        .filter(Boolean);
+
+      if (cartKeys.length === 0) return;
+
+      if (!authToken) {
+        setCartItems((prevItems) =>
+          prevItems.filter((item) => !cartKeys.includes(item.cartKey))
+        );
+        return;
+      }
+
+      let latestCart = null;
+
+      for (const cartKey of cartKeys) {
+        try {
+          latestCart = await removeCartItemRequest(authToken, cartKey);
+        } catch (error) {
+          console.error("Error removing purchased cart item:", error);
+        }
+      }
+
+      if (latestCart) {
+        applyServerCart(latestCart);
+        return;
+      }
+
+      setCartItems((prevItems) =>
+        prevItems.filter((item) => !cartKeys.includes(item.cartKey))
+      );
+    },
+    [authToken, applyServerCart]
+  );
 
   useEffect(() => {
     localStorage.setItem("cartItems", JSON.stringify(cartItems));
   }, [cartItems]);
+
+  useEffect(() => {
+    authTokenRef.current = authToken;
+  }, [authToken]);
+
+  useEffect(() => {
+    cartItemsRef.current = cartItems;
+  }, [cartItems]);
+
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const nextToken = getStoredToken();
+
+      if (!authTokenRef.current && nextToken) {
+        guestCartSnapshotRef.current = cartItemsRef.current;
+      }
+
+      setAuthToken(nextToken);
+    };
+
+    window.addEventListener("authChanged", handleAuthChanged);
+    window.addEventListener("storage", handleAuthChanged);
+
+    return () => {
+      window.removeEventListener("authChanged", handleAuthChanged);
+      window.removeEventListener("storage", handleAuthChanged);
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedItemIds((prev) => {
@@ -107,12 +277,22 @@ export function CartProvider({ children }) {
   }, [cartItems, isManualSelection]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    if (!authToken) return;
+
+    const guestItems = guestCartSnapshotRef.current;
+    guestCartSnapshotRef.current = [];
+    syncCartFromServer(guestItems);
+  }, [authToken, syncCartFromServer]);
+
+  useEffect(() => {
+    if (!authToken) {
+      setOrders([]);
+      return;
+    }
 
     axios
       .get(buildApiUrl("/orders/my"), {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       })
       .then((response) => {
         const serverOrders = Array.isArray(response?.data?.orders)
@@ -123,13 +303,12 @@ export function CartProvider({ children }) {
       .catch((error) => {
         console.error("Error fetching orders from backend:", error);
       });
-  }, []);
+  }, [authToken]);
 
   useEffect(() => {
     if (!pendingZaloPayOrder) return;
 
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!authToken) {
       setPendingZaloPayOrder(null);
       localStorage.removeItem("pendingZaloPayOrder");
       return;
@@ -143,11 +322,11 @@ export function CartProvider({ children }) {
         await axios.post(
           buildApiUrl(`/payment/zalopay/confirm/${pendingZaloPayOrder.id}`),
           {},
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${authToken}` } }
         );
 
         const ordersResponse = await axios.get(buildApiUrl("/orders/my"), {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authToken}` },
         });
         const serverOrders = Array.isArray(ordersResponse?.data?.orders)
           ? ordersResponse.data.orders
@@ -162,45 +341,86 @@ export function CartProvider({ children }) {
     }, remainingTime);
 
     return () => clearTimeout(timeoutId);
-  }, [pendingZaloPayOrder]);
+  }, [authToken, pendingZaloPayOrder]);
 
-  const addToCart = (product) => {
-    const nextItem = normalizeCartItem(product);
+  const addToCart = useCallback(
+    async (product) => {
+      const nextItem = normalizeCartItem(product);
 
-    setCartItems((prevItems) => {
-      const existingItem = prevItems.find(
-        (item) => item.cartKey === nextItem.cartKey
-      );
-
-      if (existingItem) {
-        return prevItems.map((item) =>
-          item.cartKey === nextItem.cartKey
-            ? { ...item, quantity: item.quantity + nextItem.quantity }
-            : item
-        );
+      if (authToken) {
+        try {
+          const cart = await addCartItemRequest(
+            authToken,
+            buildCartApiItemPayload(nextItem)
+          );
+          applyServerCart(cart);
+          return;
+        } catch (error) {
+          console.error("Error adding item to backend cart:", error);
+        }
       }
 
-      return [...prevItems, nextItem];
-    });
-  };
+      setCartItems((prevItems) => mergeLocalCartItems(prevItems, nextItem));
+    },
+    [authToken, applyServerCart]
+  );
 
-  const decreaseQuantity = (cartKey) => {
-    setCartItems((prevItems) =>
-      prevItems
-        .map((item) =>
-          item.cartKey === cartKey
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
-  };
+  const decreaseQuantity = useCallback(
+    async (cartKey) => {
+      const existingItem = cartItems.find((item) => item.cartKey === cartKey);
+      if (!existingItem) return;
 
-  const removeFromCart = (cartKey) => {
-    setCartItems((prevItems) =>
-      prevItems.filter((item) => item.cartKey !== cartKey)
-    );
-  };
+      if (authToken) {
+        try {
+          if (existingItem.quantity <= 1) {
+            const cart = await removeCartItemRequest(authToken, cartKey);
+            applyServerCart(cart);
+            return;
+          }
+
+          const cart = await updateCartItemQuantityRequest(
+            authToken,
+            cartKey,
+            existingItem.quantity - 1
+          );
+          applyServerCart(cart);
+          return;
+        } catch (error) {
+          console.error("Error decreasing backend cart quantity:", error);
+        }
+      }
+
+      setCartItems((prevItems) =>
+        prevItems
+          .map((item) =>
+            item.cartKey === cartKey
+              ? { ...item, quantity: item.quantity - 1 }
+              : item
+          )
+          .filter((item) => item.quantity > 0)
+      );
+    },
+    [authToken, applyServerCart, cartItems]
+  );
+
+  const removeFromCart = useCallback(
+    async (cartKey) => {
+      if (authToken) {
+        try {
+          const cart = await removeCartItemRequest(authToken, cartKey);
+          applyServerCart(cart);
+          return;
+        } catch (error) {
+          console.error("Error removing item from backend cart:", error);
+        }
+      }
+
+      setCartItems((prevItems) =>
+        prevItems.filter((item) => item.cartKey !== cartKey)
+      );
+    },
+    [authToken, applyServerCart]
+  );
 
   const handlePlaceOrder = async (event) => {
     event.preventDefault();
@@ -233,13 +453,18 @@ export function CartProvider({ children }) {
       return;
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!authToken) {
       alert("Ban can dang nhap de dat mon.");
       return;
     }
 
     try {
+      const pricing = calculateCheckoutTotals({
+        items: selectedItems,
+        fulfillmentType: formData.fulfillmentType,
+        voucherResult,
+      });
+
       const payload = {
         customerName: formData.name,
         customerPhone: formData.phone,
@@ -247,7 +472,9 @@ export function CartProvider({ children }) {
           formData.fulfillmentType === "delivery" ? formData.address : "",
         fulfillmentType: formData.fulfillmentType,
         pickupTime:
-          formData.fulfillmentType === "pickup" ? formData.pickupTime : undefined,
+          formData.fulfillmentType === "pickup"
+            ? formData.pickupTime
+            : undefined,
         tableBooking:
           formData.fulfillmentType === "dine_in"
             ? {
@@ -257,21 +484,13 @@ export function CartProvider({ children }) {
               }
             : undefined,
         paymentMethod,
+        deliveryFee: pricing.deliveryFee,
         voucherCode: voucherCode || undefined,
-        items: selectedItems.map((item) => ({
-          productId: item.id,
-          productName: item.name,
-          productImage: item.imageUrl,
-          quantity: item.quantity,
-          price: item.newPrice,
-          selectedSize: item.selectedSize,
-          selectedAddons: item.selectedAddons || [],
-          itemNote: item.itemNote || "",
-        })),
+        items: selectedItems.map(buildOrderItemPayload),
       };
 
       const response = await axios.post(buildApiUrl("/orders"), payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
 
       const createdOrder = response?.data?.order;
@@ -295,9 +514,7 @@ export function CartProvider({ children }) {
           );
 
           if (directCheckoutItems.length === 0) {
-            setCartItems((prev) =>
-              prev.filter((item) => !selectedItemIds.includes(item.cartKey))
-            );
+            await removePurchasedCartItems(selectedItems);
           }
 
           setSelectedItemIds([]);
@@ -320,9 +537,7 @@ export function CartProvider({ children }) {
       setOrderSuccess(true);
 
       if (directCheckoutItems.length === 0) {
-        setCartItems((prev) =>
-          prev.filter((item) => !selectedItemIds.includes(item.cartKey))
-        );
+        await removePurchasedCartItems(selectedItems);
       }
 
       setSelectedItemIds([]);

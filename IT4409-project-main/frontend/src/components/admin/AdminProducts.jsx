@@ -17,7 +17,14 @@ import {
 import { clearProductsCache } from "../../api/productsApi";
 import { buildApiUrl } from "../../config/api";
 import { categories } from "../../data/categories";
-import { formatPriceAdmin } from "./utils";
+import {
+  buildAdminProductPayload,
+  createAdminAddon,
+  createAdminSize,
+  createEmptyAdminProductForm,
+  formatPriceAdmin,
+  normalizeAdminProductForm,
+} from "./utils";
 
 const ITEM_TYPE_OPTIONS = [
   { value: "single", label: "Mon le" },
@@ -40,169 +47,9 @@ const inputClass =
 const textareaClass = `${inputClass} min-h-[120px] resize-y`;
 const labelClass = "mb-2 block text-sm font-semibold text-slate-700";
 
-const createEmptySize = () => ({
-  label: "",
-  priceModifier: "0",
-  isDefault: false,
-});
-
-const createEmptyAddon = () => ({
-  label: "",
-  price: "0",
-  maxQuantity: "1",
-  isAvailable: true,
-});
-
-const createEmptyForm = () => ({
-  name: "",
-  slug: "",
-  category: "combo",
-  itemType: "single",
-  description: "",
-  price: "",
-  discountPrice: "",
-  stock: "0",
-  preparationTime: "15",
-  spiceLevel: "",
-  sizes: [createEmptySize()],
-  addons: [createEmptyAddon()],
-  comboItemsText: "",
-  badgesText: "",
-  highlightsText: "",
-  isAvailable: true,
-  isActive: true,
-  isBestSeller: false,
-  isNew: false,
-  existingImages: [],
-  imageFiles: [],
-});
-
 const toNumber = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const splitTextLines = (value) =>
-  String(value || "")
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-const splitTags = (value) =>
-  String(value || "")
-    .split(/[\r\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-const sanitizeSizes = (sizes) => {
-  const nextSizes = (Array.isArray(sizes) ? sizes : [])
-    .map((size) => ({
-      label: String(size.label || "").trim(),
-      priceModifier: toNumber(size.priceModifier, 0),
-      isDefault: Boolean(size.isDefault),
-    }))
-    .filter((size) => size.label);
-
-  if (nextSizes.length > 0 && !nextSizes.some((size) => size.isDefault)) {
-    nextSizes[0].isDefault = true;
-  }
-
-  return nextSizes;
-};
-
-const sanitizeAddons = (addons) =>
-  (Array.isArray(addons) ? addons : [])
-    .map((addon) => ({
-      label: String(addon.label || "").trim(),
-      price: toNumber(addon.price, 0),
-      maxQuantity: Math.max(1, toNumber(addon.maxQuantity, 1)),
-      isAvailable: addon.isAvailable !== false,
-    }))
-    .filter((addon) => addon.label);
-
-const normalizeProductForForm = (product) => ({
-  name: product.name || "",
-  slug: product.slug || "",
-  category:
-    product.category?.slug || product.category?.name || product.category || "combo",
-  itemType: product.itemType || "single",
-  description: product.description || "",
-  price: String(product.price ?? ""),
-  discountPrice:
-    product.discountPrice === undefined || product.discountPrice === null
-      ? ""
-      : String(product.discountPrice),
-  stock: String(product.stock ?? 0),
-  preparationTime: String(product.preparationTime ?? 15),
-  spiceLevel: product.spiceLevel || "",
-  sizes:
-    Array.isArray(product.sizes) && product.sizes.length > 0
-      ? product.sizes.map((size) => ({
-          label: size.label || "",
-          priceModifier: String(size.priceModifier ?? 0),
-          isDefault: Boolean(size.isDefault),
-        }))
-      : [createEmptySize()],
-  addons:
-    Array.isArray(product.addons) && product.addons.length > 0
-      ? product.addons.map((addon) => ({
-          label: addon.label || "",
-          price: String(addon.price ?? 0),
-          maxQuantity: String(addon.maxQuantity ?? 1),
-          isAvailable: addon.isAvailable !== false,
-        }))
-      : [createEmptyAddon()],
-  comboItemsText: Array.isArray(product.comboItems)
-    ? product.comboItems.join("\n")
-    : "",
-  badgesText: Array.isArray(product.badges) ? product.badges.join(", ") : "",
-  highlightsText: Array.isArray(product.highlights)
-    ? product.highlights.join("\n")
-    : "",
-  isAvailable: product.isAvailable !== false,
-  isActive: product.isActive !== false,
-  isBestSeller: Boolean(product.isBestSeller),
-  isNew: Boolean(product.isNew),
-  existingImages: Array.isArray(product.images) ? product.images : [],
-  imageFiles: [],
-});
-
-const buildProductPayload = (formState) => {
-  const payload = new FormData();
-  const sizes = sanitizeSizes(formState.sizes);
-  const addons = sanitizeAddons(formState.addons);
-
-  payload.append("name", formState.name.trim());
-  payload.append("slug", formState.slug.trim());
-  payload.append("category", formState.category);
-  payload.append("itemType", formState.itemType);
-  payload.append("description", formState.description.trim());
-  payload.append("price", String(toNumber(formState.price, 0)));
-  payload.append(
-    "discountPrice",
-    formState.discountPrice === "" ? "" : String(toNumber(formState.discountPrice, 0))
-  );
-  payload.append("stock", String(Math.max(0, toNumber(formState.stock, 0))));
-  payload.append(
-    "preparationTime",
-    String(Math.max(0, toNumber(formState.preparationTime, 15)))
-  );
-  payload.append("spiceLevel", formState.spiceLevel);
-  payload.append("sizes", JSON.stringify(sizes));
-  payload.append("addons", JSON.stringify(addons));
-  payload.append("comboItems", JSON.stringify(splitTextLines(formState.comboItemsText)));
-  payload.append("badges", JSON.stringify(splitTags(formState.badgesText)));
-  payload.append("highlights", JSON.stringify(splitTextLines(formState.highlightsText)));
-  payload.append("isAvailable", String(formState.isAvailable));
-  payload.append("isActive", String(formState.isActive));
-  payload.append("isBestSeller", String(formState.isBestSeller));
-  payload.append("isNew", String(formState.isNew));
-
-  formState.imageFiles.forEach((file) => {
-    payload.append("images", file);
-  });
-
-  return payload;
 };
 
 const getProductImage = (product) => product.images?.[0] || product.image || "";
@@ -225,7 +72,7 @@ export const AdminProducts = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [formState, setFormState] = useState(createEmptyForm);
+  const [formState, setFormState] = useState(createEmptyAdminProductForm);
   const [editingProductId, setEditingProductId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
@@ -289,14 +136,14 @@ export const AdminProducts = () => {
 
   const openCreateForm = () => {
     setEditingProductId(null);
-    setFormState(createEmptyForm());
+    setFormState(createEmptyAdminProductForm());
     setError("");
     setShowForm(true);
   };
 
   const openEditForm = (product) => {
     setEditingProductId(product._id);
-    setFormState(normalizeProductForForm(product));
+    setFormState(normalizeAdminProductForm(product));
     setError("");
     setShowForm(true);
   };
@@ -304,7 +151,7 @@ export const AdminProducts = () => {
   const closeForm = () => {
     setShowForm(false);
     setEditingProductId(null);
-    setFormState(createEmptyForm());
+    setFormState(createEmptyAdminProductForm());
   };
 
   const updateField = (field, value) => {
@@ -340,7 +187,10 @@ export const AdminProducts = () => {
       const next = prev[field].filter((_, itemIndex) => itemIndex !== index);
       return {
         ...prev,
-        [field]: next.length > 0 ? next : [field === "sizes" ? createEmptySize() : createEmptyAddon()],
+        [field]:
+          next.length > 0
+            ? next
+            : [field === "sizes" ? createAdminSize() : createAdminAddon()],
       };
     });
   };
@@ -373,7 +223,7 @@ export const AdminProducts = () => {
     setSaving(true);
 
     try {
-      const payload = buildProductPayload(formState);
+      const payload = buildAdminProductPayload(formState);
       const config = {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -864,6 +714,18 @@ export const AdminProducts = () => {
                         />
                       </div>
                       <div>
+                        <label className={labelClass}>Da ban</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formState.soldCount}
+                          onChange={(event) =>
+                            updateField("soldCount", event.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
                         <label className={labelClass}>Thoi gian chuan bi (phut)</label>
                         <input
                           type="number"
@@ -998,7 +860,7 @@ export const AdminProducts = () => {
                     <h4 className="font-semibold text-slate-950">Sizes</h4>
                     <button
                       type="button"
-                      onClick={() => addDynamicItem("sizes", createEmptySize)}
+                      onClick={() => addDynamicItem("sizes", createAdminSize)}
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Plus size={16} />
@@ -1068,7 +930,7 @@ export const AdminProducts = () => {
                     <h4 className="font-semibold text-slate-950">Add-ons / toppings</h4>
                     <button
                       type="button"
-                      onClick={() => addDynamicItem("addons", createEmptyAddon)}
+                      onClick={() => addDynamicItem("addons", createAdminAddon)}
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Plus size={16} />
