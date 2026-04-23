@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import SEO from "../../components/common/SEO";
-import { getProductById } from "../../api/productsApi";
+import { getProductById } from "../../api/productsApi.js";
 import { createReview, getReviews } from "../../api/reviewApi";
 import { useCart } from "../../hooks/useCart";
 import { useToast } from "../../contexts/ToastContext";
-import { calculateConfiguredUnitPrice } from "../../utils/cartItem";
+import { calculateConfiguredUnitPrice } from "../../utils/cartItem.js";
 import "./ProductDetailPage.css";
 
 export const ProductDetailPage = () => {
@@ -41,6 +41,8 @@ export const ProductDetailPage = () => {
         setSelectedSize(
           data?.sizes?.find((size) => size.isDefault) || data?.sizes?.[0] || null
         );
+        setSelectedAddons([]);
+        setItemNote("");
 
         try {
           const reviewResponse = await getReviews(id);

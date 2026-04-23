@@ -8,8 +8,13 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
+
 import { buildApiUrl } from "../../config/api";
-import { formatPriceAdmin } from "./utils";
+import {
+  describeVoucherScope,
+  formatAdminVoucherValue,
+  formatPriceAdmin,
+} from "./utils";
 
 const createInitialForm = () => ({
   code: "",
@@ -25,6 +30,7 @@ const createInitialForm = () => ({
   appliesToAllProducts: true,
   userIds: [],
   productIds: [],
+  categoryIds: [],
 });
 
 const inputClass =
@@ -35,21 +41,20 @@ const isExpiringSoon = (voucher) => {
   if (!voucher?.endDate) return false;
   const endDate = new Date(voucher.endDate);
   if (Number.isNaN(endDate.getTime())) return false;
-  const now = new Date();
-  const diff = endDate.getTime() - now.getTime();
+  const diff = endDate.getTime() - Date.now();
   return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
 };
-
-const formatVoucherValue = (voucher) =>
-  voucher.discountType === "percent"
-    ? `${voucher.discountValue}%`
-    : formatPriceAdmin(voucher.discountValue);
 
 const formatDate = (value) => {
   if (!value) return "--";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString("vi-VN");
+};
+
+const getTargetSummary = (form) => {
+  if (form.appliesToAllProducts) return "Toan bo menu";
+  return `${form.productIds.length} mon | ${form.categoryIds.length} danh muc`;
 };
 
 export default function AdminVouchers() {
@@ -62,12 +67,16 @@ export default function AdminVouchers() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
   const [userResults, setUserResults] = useState([]);
   const [productResults, setProductResults] = useState([]);
+  const [categoryResults, setCategoryResults] = useState([]);
   const [userLoading, setUserLoading] = useState(false);
   const [productLoading, setProductLoading] = useState(false);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   const [actingVoucherId, setActingVoucherId] = useState("");
 
   const getAuthConfig = () => {
@@ -119,7 +128,7 @@ export default function AdminVouchers() {
       active: vouchers.filter((voucher) => voucher.isActive).length,
       expiringSoon: vouchers.filter(isExpiringSoon).length,
       targeted: vouchers.filter(
-        (voucher) => !voucher.appliesToAllUsers || !voucher.appliesToAllProducts
+        (voucher) => !voucher.appliesToAllUsers || describeVoucherScope(voucher) !== "Toan bo menu"
       ).length,
       totalUses: vouchers.reduce(
         (sum, voucher) => sum + Number(voucher.usedCount || 0),
@@ -147,6 +156,7 @@ export default function AdminVouchers() {
             ...prev,
             appliesToAllProducts: checked,
             productIds: checked ? [] : prev.productIds,
+            categoryIds: checked ? [] : prev.categoryIds,
           };
         }
 
@@ -172,8 +182,10 @@ export default function AdminVouchers() {
     setForm(createInitialForm());
     setUserResults([]);
     setProductResults([]);
+    setCategoryResults([]);
     setUserSearch("");
     setProductSearch("");
+    setCategorySearch("");
   };
 
   const handleCreateVoucher = async (event) => {
@@ -187,6 +199,15 @@ export default function AdminVouchers() {
         {
           ...form,
           code: form.code.trim().toUpperCase(),
+          discountValue:
+            form.discountType === "free_shipping" ? 0 : Number(form.discountValue || 0),
+          maxDiscountAmount:
+            form.discountType === "percent"
+              ? Number(form.maxDiscountAmount || 0)
+              : 0,
+          userIds: form.appliesToAllUsers ? [] : form.userIds,
+          productIds: form.appliesToAllProducts ? [] : form.productIds,
+          categoryIds: form.appliesToAllProducts ? [] : form.categoryIds,
         },
         getAuthConfig()
       );
@@ -272,21 +293,40 @@ export default function AdminVouchers() {
     }
   };
 
+  const fetchCategories = async (searchValue) => {
+    setCategoryLoading(true);
+    try {
+      const response = await axios.get(buildApiUrl("/vouchers/search-categories"), {
+        ...getAuthConfig(),
+        params: searchValue ? { q: searchValue } : {},
+      });
+      setCategoryResults(
+        Array.isArray(response.data?.categories) ? response.data.categories : []
+      );
+    } catch (err) {
+      console.error("Failed to search categories", err);
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!userModalOpen) return undefined;
-    const timeoutId = setTimeout(() => {
-      fetchUsers(userSearch);
-    }, 300);
+    const timeoutId = setTimeout(() => fetchUsers(userSearch), 300);
     return () => clearTimeout(timeoutId);
   }, [userModalOpen, userSearch]);
 
   useEffect(() => {
     if (!productModalOpen) return undefined;
-    const timeoutId = setTimeout(() => {
-      fetchProducts(productSearch);
-    }, 300);
+    const timeoutId = setTimeout(() => fetchProducts(productSearch), 300);
     return () => clearTimeout(timeoutId);
   }, [productModalOpen, productSearch]);
+
+  useEffect(() => {
+    if (!categoryModalOpen) return undefined;
+    const timeoutId = setTimeout(() => fetchCategories(categorySearch), 300);
+    return () => clearTimeout(timeoutId);
+  }, [categoryModalOpen, categorySearch]);
 
   const openUserModal = () => {
     setUserModalOpen(true);
@@ -298,6 +338,12 @@ export default function AdminVouchers() {
     setProductModalOpen(true);
     setProductSearch("");
     fetchProducts("");
+  };
+
+  const openCategoryModal = () => {
+    setCategoryModalOpen(true);
+    setCategorySearch("");
+    fetchCategories("");
   };
 
   const toggleUserSelection = (userId) => {
@@ -320,6 +366,16 @@ export default function AdminVouchers() {
     }));
   };
 
+  const toggleCategorySelection = (categoryId) => {
+    setForm((prev) => ({
+      ...prev,
+      appliesToAllProducts: false,
+      categoryIds: prev.categoryIds.includes(categoryId)
+        ? prev.categoryIds.filter((item) => item !== categoryId)
+        : [...prev.categoryIds, categoryId],
+    }));
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-[30px] bg-gradient-to-br from-slate-950 via-slate-900 to-orange-950 p-6 text-white shadow-2xl shadow-slate-900/15">
@@ -332,8 +388,8 @@ export default function AdminVouchers() {
               FireBite Voucher Desk
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Quan ly voucher toan cua hang, campaign theo user nhom va uu dai
-              cho tung mon trong menu.
+              Quan ly voucher toan cua hang, free ship, target user va uu dai theo
+              tung mon hoac danh muc menu.
             </p>
           </div>
 
@@ -403,7 +459,7 @@ export default function AdminVouchers() {
           {[1, 2, 3, 4].map((item) => (
             <div
               key={item}
-              className="h-56 rounded-[28px] border border-slate-100 bg-white animate-pulse"
+              className="h-56 animate-pulse rounded-[28px] border border-slate-100 bg-white"
             />
           ))}
         </div>
@@ -432,7 +488,7 @@ export default function AdminVouchers() {
                     {voucher.code}
                   </div>
                   <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
-                    {formatVoucherValue(voucher)}
+                    {formatAdminVoucherValue(voucher)}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {voucher.description || "Khong co mo ta cho voucher nay."}
@@ -489,10 +545,8 @@ export default function AdminVouchers() {
                     {voucher.appliesToAllUsers
                       ? "Tat ca user"
                       : `${voucher.users?.length || 0} user`}
-                    {" • "}
-                    {voucher.appliesToAllProducts
-                      ? "Toan bo menu"
-                      : `${voucher.products?.length || 0} mon`}
+                    {" | "}
+                    {describeVoucherScope(voucher)}
                   </div>
                 </div>
               </div>
@@ -531,7 +585,7 @@ export default function AdminVouchers() {
 
       {showCreateForm ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="max-h-[94vh] w-full max-w-4xl overflow-hidden rounded-[30px] border border-white/10 bg-white shadow-2xl">
+          <div className="max-h-[94vh] w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/10 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
@@ -557,7 +611,10 @@ export default function AdminVouchers() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateVoucher} className="max-h-[calc(94vh-92px)] overflow-y-auto p-6">
+            <form
+              onSubmit={handleCreateVoucher}
+              className="max-h-[calc(94vh-92px)] overflow-y-auto p-6"
+            >
               <div className="space-y-6">
                 <div className="grid gap-6 lg:grid-cols-2">
                   <section className="rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
@@ -595,18 +652,28 @@ export default function AdminVouchers() {
                           >
                             <option value="percent">Giam theo %</option>
                             <option value="amount">Giam so tien</option>
+                            <option value="free_shipping">Free shipping</option>
                           </select>
                         </div>
                         <div>
                           <label className={labelClass}>
-                            Gia tri {form.discountType === "percent" ? "(%)" : "(VND)"}
+                            {form.discountType === "percent"
+                              ? "Gia tri (%)"
+                              : form.discountType === "amount"
+                              ? "Gia tri (VND)"
+                              : "Gia tri"}
                           </label>
                           <input
                             type="number"
                             min="0"
                             name="discountValue"
-                            value={form.discountValue}
+                            value={
+                              form.discountType === "free_shipping"
+                                ? 0
+                                : form.discountValue
+                            }
                             onChange={handleFormChange}
+                            disabled={form.discountType === "free_shipping"}
                             className={inputClass}
                           />
                         </div>
@@ -725,15 +792,6 @@ export default function AdminVouchers() {
                           Chon toan bo menu hoac mot nhom mon cu the.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={openProductModal}
-                        disabled={form.appliesToAllProducts}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        <TicketPercent size={16} />
-                        Chon mon
-                      </button>
                     </div>
 
                     <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -746,9 +804,28 @@ export default function AdminVouchers() {
                       <span>Ap dung cho toan bo menu</span>
                     </div>
 
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={openProductModal}
+                        disabled={form.appliesToAllProducts}
+                        className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Chon mon
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openCategoryModal}
+                        disabled={form.appliesToAllProducts}
+                        className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Chon danh muc
+                      </button>
+                    </div>
+
                     {!form.appliesToAllProducts ? (
                       <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-500">
-                        Da chon {form.productIds.length} mon
+                        {getTargetSummary(form)}
                       </div>
                     ) : null}
                   </div>
@@ -880,6 +957,58 @@ export default function AdminVouchers() {
                 ) : (
                   <div className="p-4 text-sm text-slate-400">
                     Khong tim thay mon phu hop.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {categoryModalOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="font-semibold text-slate-950">Chon danh muc ap dung</h3>
+              <button
+                type="button"
+                onClick={() => setCategoryModalOpen(false)}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Dong
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <input
+                type="text"
+                value={categorySearch}
+                onChange={(event) => setCategorySearch(event.target.value)}
+                placeholder="Tim theo ten danh muc..."
+                className={inputClass}
+              />
+
+              <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
+                {categoryLoading ? (
+                  <div className="p-4 text-sm text-slate-400">
+                    Dang tai danh muc...
+                  </div>
+                ) : categoryResults.length > 0 ? (
+                  categoryResults.map((category) => (
+                    <label
+                      key={category._id}
+                      className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm text-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.categoryIds.includes(category._id)}
+                        onChange={() => toggleCategorySelection(category._id)}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-slate-400">
+                    Khong tim thay danh muc phu hop.
                   </div>
                 )}
               </div>

@@ -8,8 +8,8 @@ import FilterSidebar from "../../components/filters/FilterSidebar";
 import ProductCard from "../../components/product/ProductCard";
 import ProductCardSkeleton from "../../components/product/ProductCard/ProductCardSkeleton";
 import ProductToolbar from "../../components/product/ProductToolbar";
-import { getProducts } from "../../api/productsApi";
-import { getCategoryDisplayName } from "../../data/categories";
+import { getProducts } from "../../api/productsApi.js";
+import { getCategoryDisplayName } from "../../data/categories.js";
 import "./ProductListingPage.css";
 
 const ProductListingPage = () => {
@@ -30,11 +30,30 @@ const ProductListingPage = () => {
     availableOnly: false,
   });
 
+  const backendQuery = useMemo(
+    () => ({
+      search: searchQuery || "",
+      category: categorySlug || "",
+      itemType: filters.itemTypes.length === 1 ? filters.itemTypes[0] : "",
+      spiceLevel: filters.spiceLevels.length === 1 ? filters.spiceLevels[0] : "",
+      available: filters.availableOnly ? "true" : "",
+      featured: filters.featuredOnly ? "true" : "",
+    }),
+    [
+      categorySlug,
+      filters.availableOnly,
+      filters.featuredOnly,
+      filters.itemTypes,
+      filters.spiceLevels,
+      searchQuery,
+    ]
+  );
+
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true);
       try {
-        setProducts(await getProducts());
+        setProducts(await getProducts(backendQuery));
       } catch (error) {
         console.error("Load menu error:", error);
       } finally {
@@ -43,7 +62,7 @@ const ProductListingPage = () => {
     };
 
     loadProducts();
-  }, []);
+  }, [backendQuery]);
 
   useEffect(() => {
     setFilters({
@@ -80,30 +99,6 @@ const ProductListingPage = () => {
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
-
-    if (categorySlug) {
-      result = result.filter(
-        (product) => product.category?.slug === categorySlug
-      );
-    }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter((product) => {
-        const haystack = [
-          product.name,
-          product.description,
-          product.category?.name,
-          ...(product.highlights || []),
-          ...(product.badges || []),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        return haystack.includes(query);
-      });
-    }
 
     if (filters.priceRange) {
       result = result.filter((product) => {
@@ -149,6 +144,7 @@ const ProductListingPage = () => {
         return result.sort((a, b) => {
           if (a.isBestSeller && !b.isBestSeller) return -1;
           if (!a.isBestSeller && b.isBestSeller) return 1;
+          if (a.soldCount !== b.soldCount) return b.soldCount - a.soldCount;
           return b.reviewCount - a.reviewCount;
         });
       default:

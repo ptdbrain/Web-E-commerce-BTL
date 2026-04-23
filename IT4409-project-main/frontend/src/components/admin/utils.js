@@ -56,6 +56,209 @@ const paymentMeta = {
   vnpay: "VNPay",
 };
 
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+export const splitTextLines = (value) =>
+  String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+export const splitTags = (value) =>
+  String(value || "")
+    .split(/[\r\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+export const sanitizeSizes = (sizes = []) => {
+  const nextSizes = (Array.isArray(sizes) ? sizes : [])
+    .map((size) => ({
+      label: String(size?.label || "").trim(),
+      priceModifier: toNumber(size?.priceModifier, 0),
+      isDefault: Boolean(size?.isDefault),
+    }))
+    .filter((size) => size.label);
+
+  if (nextSizes.length > 0 && !nextSizes.some((size) => size.isDefault)) {
+    nextSizes[0].isDefault = true;
+  }
+
+  return nextSizes;
+};
+
+export const sanitizeAddons = (addons = []) =>
+  (Array.isArray(addons) ? addons : [])
+    .map((addon) => ({
+      label: String(addon?.label || "").trim(),
+      price: toNumber(addon?.price, 0),
+      maxQuantity: Math.max(1, toNumber(addon?.maxQuantity, 1)),
+      isAvailable: addon?.isAvailable !== false,
+    }))
+    .filter((addon) => addon.label);
+
+export const createAdminSize = () => ({
+  label: "",
+  priceModifier: "0",
+  isDefault: false,
+});
+
+export const createAdminAddon = () => ({
+  label: "",
+  price: "0",
+  maxQuantity: "1",
+  isAvailable: true,
+});
+
+export const createEmptyAdminProductForm = () => ({
+  name: "",
+  slug: "",
+  category: "combo",
+  itemType: "single",
+  description: "",
+  price: "",
+  discountPrice: "",
+  stock: "0",
+  soldCount: "0",
+  preparationTime: "15",
+  spiceLevel: "",
+  sizes: [createAdminSize()],
+  addons: [createAdminAddon()],
+  comboItemsText: "",
+  badgesText: "",
+  highlightsText: "",
+  isAvailable: true,
+  isActive: true,
+  isBestSeller: false,
+  isNew: false,
+  existingImages: [],
+  imageFiles: [],
+});
+
+export const normalizeAdminProductForm = (product = {}) => ({
+  name: product.name || "",
+  slug: product.slug || "",
+  category:
+    product.category?.slug || product.category?.name || product.category || "combo",
+  itemType: product.itemType || "single",
+  description: product.description || "",
+  price: String(product.price ?? ""),
+  discountPrice:
+    product.discountPrice === undefined || product.discountPrice === null
+      ? ""
+      : String(product.discountPrice),
+  stock: String(product.stock ?? 0),
+  soldCount: String(product.soldCount ?? 0),
+  preparationTime: String(product.preparationTime ?? 15),
+  spiceLevel: product.spiceLevel || "",
+  sizes:
+    Array.isArray(product.sizes) && product.sizes.length > 0
+      ? product.sizes.map((size) => ({
+          label: size.label || "",
+          priceModifier: String(size.priceModifier ?? 0),
+          isDefault: Boolean(size.isDefault),
+        }))
+      : [createAdminSize()],
+  addons:
+    Array.isArray(product.addons) && product.addons.length > 0
+      ? product.addons.map((addon) => ({
+          label: addon.label || "",
+          price: String(addon.price ?? 0),
+          maxQuantity: String(addon.maxQuantity ?? 1),
+          isAvailable: addon.isAvailable !== false,
+        }))
+      : [createAdminAddon()],
+  comboItemsText: Array.isArray(product.comboItems)
+    ? product.comboItems.join("\n")
+    : "",
+  badgesText: Array.isArray(product.badges) ? product.badges.join(", ") : "",
+  highlightsText: Array.isArray(product.highlights)
+    ? product.highlights.join("\n")
+    : "",
+  isAvailable: product.isAvailable !== false,
+  isActive: product.isActive !== false,
+  isBestSeller: Boolean(product.isBestSeller),
+  isNew: Boolean(product.isNew),
+  existingImages: Array.isArray(product.images) ? product.images : [],
+  imageFiles: [],
+});
+
+export const buildAdminProductPayload = (formState = {}) => {
+  const payload = new FormData();
+
+  payload.append("name", String(formState.name || "").trim());
+  payload.append("slug", String(formState.slug || "").trim());
+  payload.append("category", String(formState.category || "").trim());
+  payload.append("itemType", String(formState.itemType || "single").trim());
+  payload.append("description", String(formState.description || "").trim());
+  payload.append("price", String(toNumber(formState.price, 0)));
+  payload.append(
+    "discountPrice",
+    formState.discountPrice === ""
+      ? ""
+      : String(toNumber(formState.discountPrice, 0))
+  );
+  payload.append("stock", String(Math.max(0, toNumber(formState.stock, 0))));
+  payload.append(
+    "soldCount",
+    String(Math.max(0, toNumber(formState.soldCount, 0)))
+  );
+  payload.append(
+    "preparationTime",
+    String(Math.max(0, toNumber(formState.preparationTime, 15)))
+  );
+  payload.append("spiceLevel", String(formState.spiceLevel || ""));
+  payload.append("sizes", JSON.stringify(sanitizeSizes(formState.sizes)));
+  payload.append("addons", JSON.stringify(sanitizeAddons(formState.addons)));
+  payload.append(
+    "comboItems",
+    JSON.stringify(splitTextLines(formState.comboItemsText))
+  );
+  payload.append("badges", JSON.stringify(splitTags(formState.badgesText)));
+  payload.append(
+    "highlights",
+    JSON.stringify(splitTextLines(formState.highlightsText))
+  );
+  payload.append("isAvailable", String(formState.isAvailable !== false));
+  payload.append("isActive", String(formState.isActive !== false));
+  payload.append("isBestSeller", String(Boolean(formState.isBestSeller)));
+  payload.append("isNew", String(Boolean(formState.isNew)));
+
+  (Array.isArray(formState.imageFiles) ? formState.imageFiles : []).forEach((file) => {
+    payload.append("images", file);
+  });
+
+  return payload;
+};
+
+export const describeVoucherScope = (voucher = {}) => {
+  const productCount = voucher.products?.length || 0;
+  const categoryCount = voucher.categories?.length || 0;
+
+  if (
+    voucher.appliesToAllProducts ||
+    (productCount === 0 && categoryCount === 0)
+  ) {
+    return "Toan bo menu";
+  }
+
+  return `${productCount} mon | ${categoryCount} danh muc`;
+};
+
+export const formatAdminVoucherValue = (voucher = {}) => {
+  if (voucher.discountType === "free_shipping") {
+    return "Free ship";
+  }
+
+  if (voucher.discountType === "percent") {
+    return `${voucher.discountValue}%`;
+  }
+
+  return currencyFormatter.format(Number(voucher.discountValue || 0));
+};
+
 export const formatPriceAdmin = (price = 0) =>
   currencyFormatter.format(Number(price || 0));
 
