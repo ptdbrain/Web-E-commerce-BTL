@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng ký - Tech-Geeks</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="auth.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Tech-Geeks</h1>
+      <nav>
+        <a href="index.html">Trang chủ</a>
+        <a href="#">Sản phẩm</a>
+        <a href="cart.html">Giỏ hàng</a>
+      </nav>
+    </header>
+
+    <main class="auth-container">
+      <div class="auth-box">
+        <h2>Đăng ký</h2>
+        <div class="form-group">
+          <label>Họ tên</label>
+          <input type="text" placeholder="Nguyễn Văn A" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" placeholder="example@email.com" />
+        </div>
+        <div class="form-group">
+          <label>Mật khẩu</label>
+          <input type="password" placeholder="••••••••" />
+        </div>
+        <div class="form-group">
+          <label>Xác nhận mật khẩu</label>
+          <input type="password" placeholder="••••••••" />
+        </div>
+        <button class="btn-submit">Đăng ký</button>
+        <p class="switch">Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+      </div>
+    </main>
+
+    <footer>
+      <p>© 2024 Tech-Geeks</p>
+    </footer>
+  </body>
+</html>
