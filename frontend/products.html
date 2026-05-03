@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sản phẩm - Tech-Geeks</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="products.css" />
+</head>
+
+<body>
+    <header>
+        <h1>Tech-Geeks</h1>
+        <nav>
+            <a href="index.html">Trang chủ</a>
+            <a href="products.html">Sản phẩm</a>
+            <a href="cart.html">Giỏ hàng</a>
+        </nav>
+    </header>
+
+    <main class="products-page">
+        <!-- Sidebar lọc -->
+        <aside class="filter">
+            <h3>Lọc sản phẩm</h3>
+
+            <div class="filter-group">
+                <label>Danh mục</label>
+                <select onchange="filterProducts()">
+                    <option value="all">Tất cả</option>
+                    <option value="laptop">Laptop</option>
+                    <option value="pc">PC</option>
+                    <option value="phukien">Phụ kiện</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Giá tối đa</label>
+                <input type="range" min="5000000" max="50000000" step="1000000" value="50000000"
+                    oninput="updatePrice(this)" />
+                <p id="price-display">50.000.000 đ</p>
+            </div>
+
+            <div class="filter-group">
+                <label>Tìm kiếm</label>
+                <input type="text" placeholder="Tên sản phẩm..." oninput="filterProducts()" id="search-input" />
+            </div>
+        </aside>
+
+        <!-- Danh sách sản phẩm -->
+        <section class="product-grid">
+            <div class="product-card" data-category="laptop" data-price="25990000">
+                <img src="https://placehold.co/200x150" alt="Dell XPS 15" />
+                <h3>Laptop Dell XPS 15</h3>
+                <p class="price">25.990.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+            <div class="product-card" data-category="laptop" data-price="28990000">
+                <img src="https://placehold.co/200x150" alt="Macbook Air M2" />
+                <h3>Macbook Air M2</h3>
+                <p class="price">28.990.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+            <div class="product-card" data-category="pc" data-price="18500000">
+                <img src="https://placehold.co/200x150" alt="PC Gaming" />
+                <h3>PC Gaming RTX 4060</h3>
+                <p class="price">18.500.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+            <div class="product-card" data-category="laptop" data-price="15990000">
+                <img src="https://placehold.co/200x150" alt="Asus Vivobook" />
+                <h3>Asus Vivobook 15</h3>
+                <p class="price">15.990.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+            <div class="product-card" data-category="phukien" data-price="1500000">
+                <img src="https://placehold.co/200x150" alt="Chuột gaming" />
+                <h3>Chuột Gaming Logitech G502</h3>
+                <p class="price">1.500.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+            <div class="product-card" data-category="phukien" data-price="2500000">
+                <img src="https://placehold.co/200x150" alt="Bàn phím" />
+                <h3>Bàn phím cơ Keychron K2</h3>
+                <p class="price">2.500.000 đ</p>
+                <a href="ProductDetail.html"><button>Xem chi tiết</button></a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2026 Tech-Geeks</p>
+    </footer>
+
+    <script>
+        function updatePrice(input) {
+            const val = parseInt(input.value).toLocaleString("vi-VN");
+            document.getElementById("price-display").textContent = val + " đ";
+            filterProducts();
+        }
+
+        function filterProducts() {
+            const search = document.getElementById("search-input").value.toLowerCase();
+            const maxPrice = parseInt(document.querySelector("input[type=range]").value);
+            const category = document.querySelector("select").value;
+
+            document.querySelectorAll(".product-card").forEach(card => {
+                const name = card.querySelector("h3").textContent.toLowerCase();
+                const price = parseInt(card.dataset.price);
+                const cat = card.dataset.category;
+
+                const matchSearch = name.includes(search);
+                const matchPrice = price <= maxPrice;
+                const matchCat = category === "all" || cat === category;
+
+                card.style.display = matchSearch && matchPrice && matchCat ? "block" : "none";
+            });
+        }
+    </script>
+</body>
+
+</html>
