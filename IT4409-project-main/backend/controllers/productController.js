@@ -108,106 +108,140 @@ export const createProduct = async (req, res) => {
   }
 };
 
+const SORT_MAP = {
+  newest:     { createdAt: -1 },
+  price_asc:  { discountPrice: 1 },
+  price_desc: { discountPrice: -1 },
+  rating:     { rating: -1 },
+  bestseller: { soldCount: -1 },
+};
+
 export const getProducts = async (req, res) => {
   try {
-    const { limit } = req.query;
-    const parsedFilter = buildProductFilter(req.query);
-    const filter = {};
+    const {
+      search, searchRegex, categorySlug, itemTypes, spiceLevel,
+      isAvailable, isFeatured, minPrice, maxPrice, sortBy, page, limit,
+    } = buildProductFilter(req.query);
 
-    if (parsedFilter.categorySlug) {
-      const category = await Category.findOne({
-        slug: { $regex: `^${parsedFilter.categorySlug}$`, $options: "i" },
+    const skip = (page - 1) * limit;
+    const sortOrder = SORT_MAP[sortBy] ?? SORT_MAP.newest;
+
+    // Build base filter (common to all query branches)
+    const baseFilter = {};
+
+    if (categorySlug) {
+      const cat = await Category.findOne({
+        slug: { $regex: `^${categorySlug}$`, $options: "i" },
       }).select("_id");
+      if (!cat) return res.json({ data: [], total: 0, page, totalPages: 0 });
+      baseFilter.category = cat._id;
+    }
 
-      if (!category) {
-        return res.json([]);
+    if (itemTypes.length === 1) baseFilter.itemType = itemTypes[0];
+    else if (itemTypes.length > 1) baseFilter.itemType = { $in: itemTypes };
+
+    if (spiceLevel) baseFilter.spiceLevel = spiceLevel;
+    if (isAvailable !== undefined) baseFilter.isAvailable = isAvailable;
+    if (isFeatured) baseFilter.$or = [{ isBestSeller: true }, { isNew: true }];
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      baseFilter.discountPrice = {};
+      if (minPrice !== undefined) baseFilter.discountPrice.$gte = minPrice;
+      if (maxPrice !== undefined) baseFilter.discountPrice.$lte = maxPrice;
+    }
+
+    // Search path: $text (với index) + merge category-name matches
+    if (search) {
+      const textFilter = { ...baseFilter, $text: { $search: search } };
+
+      let textResults;
+      try {
+        textResults = await Product.find(textFilter)
+          .sort({ score: { $meta: "textScore" } })
+          .populate("category", "name slug")
+          .lean();
+      } catch {
+        // text index không khả dụng → fallback regex
+        const { $text, ...rest } = textFilter;
+        textResults = await Product.find({
+          ...rest,
+          $or: [{ name: searchRegex }, { description: searchRegex }],
+        })
+          .sort(sortOrder)
+          .populate("category", "name slug")
+          .lean();
       }
 
-      filter.category = category._id;
-    }
+      // Thêm sản phẩm thuộc category có tên/slug khớp search (không trùng textResults)
+      let merged = textResults;
+      if (!baseFilter.category) {
+        const catIds = await Category.find({
+          $or: [{ name: searchRegex }, { slug: searchRegex }],
+        }).distinct("_id");
 
-    if (parsedFilter.itemType) {
-      filter.itemType = parsedFilter.itemType;
-    }
-
-    if (parsedFilter.spiceLevel) {
-      filter.spiceLevel = parsedFilter.spiceLevel;
-    }
-
-    if (parsedFilter.isAvailable !== undefined) {
-      filter.isAvailable = parsedFilter.isAvailable;
-    }
-
-    if (parsedFilter.isFeatured === true) {
-      filter.$and = [{ $or: [{ isBestSeller: true }, { isNew: true }] }];
-    }
-
-    if (parsedFilter.searchRegex) {
-      const matchingCategories = await Category.find({
-        $or: [
-          { name: parsedFilter.searchRegex },
-          { slug: parsedFilter.searchRegex },
-        ],
-      }).select("_id");
-
-      filter.$or = [
-        { name: parsedFilter.searchRegex },
-        { slug: parsedFilter.searchRegex },
-        { description: parsedFilter.searchRegex },
-        { highlights: parsedFilter.searchRegex },
-        { badges: parsedFilter.searchRegex },
-        { comboItems: parsedFilter.searchRegex },
-      ];
-
-      if (matchingCategories.length) {
-        filter.$or.push({
-          category: { $in: matchingCategories.map((item) => item._id) },
-        });
-      }
-    }
-
-    if (Object.keys(filter).length) {
-      const query = Product.find(filter)
-        .sort({ createdAt: -1 })
-        .populate("category", "name slug");
-
-      if (limit) {
-        query.limit(Number(limit));
-      }
-
-      return res.json(await query.exec());
-    }
-
-    if (redisClient && redisClient.isOpen) {
-      const cachedProducts = await redisClient.get(PRODUCT_CACHE_KEY);
-      if (cachedProducts) {
-        const products = JSON.parse(cachedProducts);
-        if (limit) {
-          return res.json(products.slice(0, Number(limit)));
+        if (catIds.length > 0) {
+          const textIds = new Set(textResults.map((p) => String(p._id)));
+          const catResults = await Product.find({ ...baseFilter, category: { $in: catIds } })
+            .sort(sortOrder)
+            .populate("category", "name slug")
+            .lean();
+          merged = [...textResults, ...catResults.filter((p) => !textIds.has(String(p._id)))];
         }
-        return res.json(products);
       }
+
+      const total = merged.length;
+      return res.json({
+        data: merged.slice(skip, skip + limit),
+        total,
+        page,
+        totalPages: Math.ceil(total / limit) || 0,
+      });
     }
 
-    const query = Product.find()
-      .sort({ createdAt: -1 })
-      .populate("category", "name slug");
+    // Không có search → query thuần với filter + sort + pagination
+    const isFiltered = Object.keys(baseFilter).length > 0;
 
-    if (limit) {
-      query.limit(Number(limit));
+    if (!isFiltered) {
+      // Cache toàn bộ danh sách khi không có filter
+      if (redisClient && redisClient.isOpen) {
+        const cached = await redisClient.get(PRODUCT_CACHE_KEY);
+        if (cached) {
+          const all = JSON.parse(cached);
+          return res.json({
+            data: all.slice(skip, skip + limit),
+            total: all.length,
+            page,
+            totalPages: Math.ceil(all.length / limit),
+          });
+        }
+      }
+
+      const all = await Product.find().sort(sortOrder).populate("category", "name slug").lean();
+
+      if (redisClient && redisClient.isOpen) {
+        await redisClient.setEx(PRODUCT_CACHE_KEY, 3600, JSON.stringify(all));
+      }
+
+      return res.json({
+        data: all.slice(skip, skip + limit),
+        total: all.length,
+        page,
+        totalPages: Math.ceil(all.length / limit),
+      });
     }
 
-    const products = await query.exec();
+    // Query có filter: dùng countDocuments + find song song
+    const [total, data] = await Promise.all([
+      Product.countDocuments(baseFilter),
+      Product.find(baseFilter)
+        .sort(sortOrder)
+        .skip(skip)
+        .limit(limit)
+        .populate("category", "name slug")
+        .lean(),
+    ]);
 
-    if (redisClient && redisClient.isOpen) {
-      await redisClient.setEx(
-        PRODUCT_CACHE_KEY,
-        3600,
-        JSON.stringify(products)
-      );
-    }
-
-    return res.json(products);
+    return res.json({ data, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error("getProducts error", err);
     return res.status(500).json({ message: "Error fetching products" });
