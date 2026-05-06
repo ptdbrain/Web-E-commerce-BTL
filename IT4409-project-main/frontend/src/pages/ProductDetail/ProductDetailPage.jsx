@@ -145,9 +145,8 @@ export const ProductDetailPage = () => {
         userName: reviewForm.guestName,
       });
       setReviewForm({ guestName: "", rating: 5, comment: "" });
-      setReviewSort("newest");
       setReviewPage(1);
-      await loadReviews("newest", 1, false);
+      await loadReviews(reviewSort, 1, false);
       success("Cảm ơn bạn đã đánh giá sản phẩm!");
     } catch (error) {
       setReviewFormError(error?.response?.data?.message || "Gửi đánh giá thất bại.");
