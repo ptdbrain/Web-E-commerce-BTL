@@ -1,4 +1,5 @@
 import express from "express";
+import { optionalAuth } from "../middleware/optionalAuth.js";
 import {
   createReview,
   getReviewsByProduct,
@@ -6,10 +7,7 @@ import {
 
 const router = express.Router();
 
-// Lấy danh sách review theo sản phẩm
 router.get("/product/:productId", getReviewsByProduct);
-
-// Tạo review (CHO PHÉP GUEST)
-router.post("/product/:productId", createReview);
+router.post("/product/:productId", optionalAuth, createReview);
 
 export default router;
