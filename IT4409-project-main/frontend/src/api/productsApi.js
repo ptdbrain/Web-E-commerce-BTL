@@ -21,7 +21,11 @@ const buildProductsQueryString = (query = {}) => {
 
   Object.entries(query || {}).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
-    params.set(key, String(value));
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(key, value.join(","));
+    } else {
+      params.set(key, String(value));
+    }
   });
 
   return params.toString();
@@ -147,7 +151,10 @@ export const getProducts = async (queryOrForceRefresh = {}, forceRefresh = false
     const response = await axios.get(
       buildApiUrl(queryString ? `/products?${queryString}` : "/products")
     );
-    const products = (response.data || []).map(normalizeProduct);
+    // Backend trả { data, total, page, totalPages } hoặc array (legacy)
+    const raw = response.data;
+    const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
+    const products = list.map(normalizeProduct);
     if (useCache) {
       productsCache = products;
       productsCacheTime = now;

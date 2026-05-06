@@ -1,40 +1,57 @@
 const toBoolean = (value) => {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
   if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true") return true;
-    if (normalized === "false") return false;
+    const v = value.trim().toLowerCase();
+    if (v === "true") return true;
+    if (v === "false") return false;
   }
-
   return undefined;
+};
+
+const toPositiveInt = (value, fallback) => {
+  const n = parseInt(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+const toNonNegativeFloat = (value) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
 const escapeRegExp = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const VALID_SORTS = ["newest", "price_asc", "price_desc", "rating", "bestseller"];
+
 export const buildProductFilter = (query = {}) => {
-  const search = String(query.search || "").trim();
+  const search      = String(query.search || "").trim();
   const categorySlug = String(query.category || "").trim() || undefined;
-  const itemType = String(query.itemType || "").trim() || undefined;
-  const spiceLevel = String(query.spiceLevel || "").trim() || undefined;
+  const itemTypes   = String(query.itemType || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const spiceLevel  = String(query.spiceLevel || "").trim() || undefined;
   const isAvailable = toBoolean(query.available);
-  const isFeatured = toBoolean(query.featured);
-  const searchRegex = search ? new RegExp(escapeRegExp(search), "i") : undefined;
+  const isFeatured  = toBoolean(query.featured);
+  const minPrice    = toNonNegativeFloat(query.minPrice);
+  const maxPrice    = toNonNegativeFloat(query.maxPrice);
+  const sortBy      = VALID_SORTS.includes(query.sort) ? query.sort : "newest";
+  const page        = toPositiveInt(query.page, 1);
+  const limit       = Math.min(100, toPositiveInt(query.limit, 20));
 
   return {
     search,
-    searchRegex,
+    searchRegex: search ? new RegExp(escapeRegExp(search), "i") : undefined,
     categorySlug,
-    itemType,
+    itemTypes,
     spiceLevel,
     isAvailable,
     isFeatured,
+    minPrice,
+    maxPrice,
+    sortBy,
+    page,
+    limit,
   };
 };
