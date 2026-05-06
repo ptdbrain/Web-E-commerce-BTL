@@ -27,11 +27,8 @@ const VALID_SORTS = ["newest", "price_asc", "price_desc", "rating", "bestseller"
 export const buildProductFilter = (query = {}) => {
   const search      = String(query.search || "").trim();
   const categorySlug = String(query.category || "").trim() || undefined;
-  const itemTypes   = String(query.itemType || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const spiceLevel  = String(query.spiceLevel || "").trim() || undefined;
+  const itemTypes   = String(query.itemType   || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const spiceLevels = String(query.spiceLevel || "").split(",").map((s) => s.trim()).filter(Boolean);
   const isAvailable = toBoolean(query.available);
   const isFeatured  = toBoolean(query.featured);
   const minPrice    = toNonNegativeFloat(query.minPrice);
@@ -45,7 +42,7 @@ export const buildProductFilter = (query = {}) => {
     searchRegex: search ? new RegExp(escapeRegExp(search), "i") : undefined,
     categorySlug,
     itemTypes,
-    spiceLevel,
+    spiceLevels,
     isAvailable,
     isFeatured,
     minPrice,

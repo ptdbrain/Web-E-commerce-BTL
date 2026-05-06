@@ -98,7 +98,7 @@ const ProductListingPage = () => {
 
       return p;
     }, { replace: true });
-  }, [filters, sortBy]);
+  }, [filters, sortBy, setSearchParams]);
 
   // Query gửi lên backend — tất cả filter/sort server-side, limit cao để lấy đủ data
   const backendQuery = useMemo(() => ({
