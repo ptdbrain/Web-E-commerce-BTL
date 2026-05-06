@@ -19,12 +19,13 @@ const uploadBufferToCloudinary = async (fileBuffer, mimetype) => {
 
 const clearProductsCache = async () => {
   if (!redisClient || !redisClient.isOpen) return;
-  await redisClient.del(PRODUCT_CACHE_KEY);
   if (typeof redisClient.keys === "function") {
-    const bestSellerKeys = await redisClient.keys(`${BESTSELLER_CACHE_KEY}:*`);
-    if (Array.isArray(bestSellerKeys) && bestSellerKeys.length > 0) {
-      await redisClient.del(bestSellerKeys);
-    }
+    const [productKeys, bestSellerKeys] = await Promise.all([
+      redisClient.keys(`${PRODUCT_CACHE_KEY}:*`),
+      redisClient.keys(`${BESTSELLER_CACHE_KEY}:*`),
+    ]);
+    const toDelete = [...productKeys, ...bestSellerKeys].filter(Boolean);
+    if (toDelete.length > 0) await redisClient.del(toDelete);
   }
 };
 
@@ -202,9 +203,10 @@ export const getProducts = async (req, res) => {
     const isFiltered = Object.keys(baseFilter).length > 0;
 
     if (!isFiltered) {
-      // Cache toàn bộ danh sách khi không có filter
+      // Cache theo từng sort order (key khác nhau tránh trả sai thứ tự)
+      const cacheKey = `${PRODUCT_CACHE_KEY}:${sortBy}`;
       if (redisClient && redisClient.isOpen) {
-        const cached = await redisClient.get(PRODUCT_CACHE_KEY);
+        const cached = await redisClient.get(cacheKey);
         if (cached) {
           const all = JSON.parse(cached);
           return res.json({
@@ -219,7 +221,7 @@ export const getProducts = async (req, res) => {
       const all = await Product.find().sort(sortOrder).populate("category", "name slug").lean();
 
       if (redisClient && redisClient.isOpen) {
-        await redisClient.setEx(PRODUCT_CACHE_KEY, 3600, JSON.stringify(all));
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(all));
       }
 
       return res.json({
