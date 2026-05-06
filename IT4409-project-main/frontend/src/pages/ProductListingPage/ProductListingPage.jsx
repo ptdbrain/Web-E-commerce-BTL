@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import Breadcrumb from "../../components/common/Breadcrumb";
 import LoadMoreButton from "../../components/common/LoadMoreButton";
@@ -12,212 +12,183 @@ import { getProducts } from "../../api/productsApi.js";
 import { getCategoryDisplayName } from "../../data/categories.js";
 import "./ProductListingPage.css";
 
+// Map giá trị sort của toolbar → backend
+const SORT_TO_BACKEND = {
+  default:     "newest",
+  "price-asc": "price_asc",
+  rating:      "rating",
+  bestseller:  "bestseller",
+};
+
+const DEFAULT_FILTERS = {
+  priceRange:   null,
+  itemTypes:    [],
+  spiceLevels:  [],
+  featuredOnly: false,
+  availableOnly: false,
+  minRating:    0,
+};
+
+// Đọc filter state từ URL params (dùng cho lazy useState)
+const readFiltersFromUrl = (params) => ({
+  priceRange: params.get("minPrice")
+    ? { min: Number(params.get("minPrice")), max: params.get("maxPrice") ? Number(params.get("maxPrice")) : Infinity }
+    : null,
+  itemTypes:    params.get("itemType")?.split(",").filter(Boolean)   ?? [],
+  spiceLevels:  params.get("spiceLevel")?.split(",").filter(Boolean) ?? [],
+  featuredOnly: params.get("featured")  === "true",
+  availableOnly: params.get("available") === "true",
+  minRating:    Number(params.get("minRating")) || 0,
+});
+
 const ProductListingPage = () => {
   const { category: categorySlug } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get("search");
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [products, setProducts]   = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [itemsToShow, setItemsToShow] = useState(12);
-  const [sortBy, setSortBy] = useState("default");
-  const [filters, setFilters] = useState({
-    priceRange: null,
-    itemTypes: [],
-    spiceLevels: [],
-    featuredOnly: false,
-    availableOnly: false,
-  });
 
-  const backendQuery = useMemo(
-    () => ({
-      search: searchQuery || "",
-      category: categorySlug || "",
-      itemType: filters.itemTypes.length === 1 ? filters.itemTypes[0] : "",
-      spiceLevel: filters.spiceLevels.length === 1 ? filters.spiceLevels[0] : "",
-      available: filters.availableOnly ? "true" : "",
-      featured: filters.featuredOnly ? "true" : "",
-    }),
-    [
-      categorySlug,
-      filters.availableOnly,
-      filters.featuredOnly,
-      filters.itemTypes,
-      filters.spiceLevels,
-      searchQuery,
-    ]
-  );
+  // Khởi tạo từ URL params (lazy initializer chạy 1 lần khi mount)
+  const [sortBy,  setSortBy]   = useState(() => searchParams.get("sort") || "default");
+  const [filters, setFilters]  = useState(() => readFiltersFromUrl(searchParams));
 
+  // Ref theo dõi category/search trước đó để phát hiện thay đổi (không reset khi mount)
+  const prevCategoryRef = useRef(categorySlug);
+  const prevSearchRef   = useRef(searchQuery);
+
+  // Reset filters khi category hoặc search thay đổi (bỏ qua lần mount đầu)
   useEffect(() => {
-    const loadProducts = async () => {
-      setLoading(true);
-      try {
-        setProducts(await getProducts(backendQuery));
-      } catch (error) {
-        console.error("Load menu error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, [backendQuery]);
-
-  useEffect(() => {
-    setFilters({
-      priceRange: null,
-      itemTypes: [],
-      spiceLevels: [],
-      featuredOnly: false,
-      availableOnly: false,
-    });
+    const categoryChanged = prevCategoryRef.current !== categorySlug;
+    const searchChanged   = prevSearchRef.current   !== searchQuery;
+    if (!categoryChanged && !searchChanged) return;
+    prevCategoryRef.current = categorySlug;
+    prevSearchRef.current   = searchQuery;
+    setFilters(DEFAULT_FILTERS);
     setSortBy("default");
     setItemsToShow(12);
   }, [categorySlug, searchQuery]);
 
+  // Sync filters + sort → URL (bỏ qua lần render đầu tiên)
+  const isMounted = useRef(false);
+  useEffect(() => {
+    if (!isMounted.current) { isMounted.current = true; return; }
+
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+
+      if (sortBy && sortBy !== "default") p.set("sort", sortBy); else p.delete("sort");
+
+      if (filters.priceRange) {
+        p.set("minPrice", filters.priceRange.min);
+        filters.priceRange.max !== Infinity
+          ? p.set("maxPrice", filters.priceRange.max)
+          : p.delete("maxPrice");
+      } else {
+        p.delete("minPrice");
+        p.delete("maxPrice");
+      }
+
+      filters.itemTypes.length   ? p.set("itemType",   filters.itemTypes.join(","))   : p.delete("itemType");
+      filters.spiceLevels.length ? p.set("spiceLevel", filters.spiceLevels.join(",")) : p.delete("spiceLevel");
+      filters.featuredOnly       ? p.set("featured", "true")   : p.delete("featured");
+      filters.availableOnly      ? p.set("available", "true")  : p.delete("available");
+      filters.minRating > 0      ? p.set("minRating", filters.minRating) : p.delete("minRating");
+
+      return p;
+    }, { replace: true });
+  }, [filters, sortBy]);
+
+  // Query gửi lên backend — tất cả filter/sort server-side, limit cao để lấy đủ data
+  const backendQuery = useMemo(() => ({
+    search:    searchQuery || "",
+    category:  categorySlug || "",
+    sort:      SORT_TO_BACKEND[sortBy] ?? "newest",
+    itemType:  filters.itemTypes.join(","),
+    spiceLevel: filters.spiceLevels.join(","),
+    available: filters.availableOnly  ? "true" : "",
+    featured:  filters.featuredOnly   ? "true" : "",
+    minPrice:  filters.priceRange?.min,
+    maxPrice:  filters.priceRange?.max !== Infinity ? filters.priceRange?.max : undefined,
+    limit:     100,
+  }), [categorySlug, searchQuery, sortBy, filters]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await getProducts(backendQuery);
+        if (!cancelled) setProducts(data);
+      } catch (err) {
+        console.error("Load products error:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [backendQuery]);
+
+  // Chỉ còn filter client-side cho rating (chưa có trong backend)
+  const filteredProducts = useMemo(() => {
+    if (!filters.minRating) return products;
+    return products.filter((p) => p.rating >= filters.minRating);
+  }, [products, filters.minRating]);
+
+  const displayedProducts = useMemo(
+    () => filteredProducts.slice(0, itemsToShow),
+    [filteredProducts, itemsToShow]
+  );
+
   const breadcrumbItems = useMemo(() => {
     const items = [
-      { label: "Trang chu", path: "/" },
-      { label: "Menu", path: "/products" },
+      { label: "Trang chủ", path: "/" },
+      { label: "Sản phẩm", path: "/products" },
     ];
-
     if (searchQuery) {
-      items.push({
-        label: `Tim kiem: "${searchQuery}"`,
-        path: `/products?search=${searchQuery}`,
-      });
+      items.push({ label: `Tìm kiếm: "${searchQuery}"`, path: `/products?search=${encodeURIComponent(searchQuery)}` });
     } else if (categorySlug) {
-      items.push({
-        label: getCategoryDisplayName(categorySlug),
-        path: `/products/${categorySlug}`,
-      });
+      items.push({ label: getCategoryDisplayName(categorySlug), path: `/products/${categorySlug}` });
     }
-
     return items;
   }, [categorySlug, searchQuery]);
 
-  const filteredProducts = useMemo(() => {
-    let result = [...products];
-
-    if (filters.priceRange) {
-      result = result.filter((product) => {
-        const price = product.newPrice;
-        return (
-          price >= filters.priceRange.min && price <= filters.priceRange.max
-        );
-      });
-    }
-
-    if (filters.itemTypes.length > 0) {
-      result = result.filter((product) =>
-        filters.itemTypes.includes(product.itemType)
-      );
-    }
-
-    if (filters.spiceLevels.length > 0) {
-      result = result.filter((product) =>
-        filters.spiceLevels.includes(product.spiceLevel)
-      );
-    }
-
-    if (filters.featuredOnly) {
-      result = result.filter((product) => product.isBestSeller || product.isNew);
-    }
-
-    if (filters.availableOnly) {
-      result = result.filter((product) => product.isAvailable && product.stock > 0);
-    }
-
-    return result;
-  }, [products, categorySlug, searchQuery, filters]);
-
-  const sortedProducts = useMemo(() => {
-    const result = [...filteredProducts];
-
-    switch (sortBy) {
-      case "price-asc":
-        return result.sort((a, b) => a.newPrice - b.newPrice);
-      case "rating":
-        return result.sort((a, b) => b.rating - a.rating);
-      case "bestseller":
-        return result.sort((a, b) => {
-          if (a.isBestSeller && !b.isBestSeller) return -1;
-          if (!a.isBestSeller && b.isBestSeller) return 1;
-          if (a.soldCount !== b.soldCount) return b.soldCount - a.soldCount;
-          return b.reviewCount - a.reviewCount;
-        });
-      default:
-        return result.sort((a, b) => {
-          if (a.isNew && !b.isNew) return -1;
-          if (!a.isNew && b.isNew) return 1;
-          return a.preparationTime - b.preparationTime;
-        });
-    }
-  }, [filteredProducts, sortBy]);
-
-  const displayedProducts = useMemo(
-    () => sortedProducts.slice(0, itemsToShow),
-    [sortedProducts, itemsToShow]
-  );
-
   const handleLoadMore = useCallback(() => {
-    setLoadingMore(true);
-    setTimeout(() => {
-      setItemsToShow((prev) => prev + 12);
-      setLoadingMore(false);
-    }, 250);
+    setItemsToShow((prev) => prev + 12);
   }, []);
 
   const handleFilterChange = useCallback((filterKey, value) => {
     setFilters((prev) => ({ ...prev, [filterKey]: value }));
+    setItemsToShow(12);
   }, []);
 
   const handleClearFilters = useCallback(() => {
-    setFilters({
-      priceRange: null,
-      itemTypes: [],
-      spiceLevels: [],
-      featuredOnly: false,
-      availableOnly: false,
-    });
+    setFilters(DEFAULT_FILTERS);
+    setItemsToShow(12);
   }, []);
 
   const pageTitle = searchQuery
-    ? `Tim kiem: ${searchQuery}`
+    ? `Tìm kiếm: "${searchQuery}"`
     : categorySlug
     ? getCategoryDisplayName(categorySlug)
-    : "Toan bo menu";
+    : "Toàn bộ sản phẩm";
 
   if (loading) {
     return (
       <div className="product-listing-page">
         <Breadcrumb items={breadcrumbItems} />
         <div className="plp-container">
-          <aside className="filter-sidebar" style={{ opacity: 0.6 }}>
+          <aside className="filter-sidebar" style={{ opacity: 0.5 }}>
             <div style={{ padding: "20px" }}>
-              <div
-                style={{
-                  height: "30px",
-                  background: "#f0f0f0",
-                  borderRadius: "4px",
-                  marginBottom: "20px",
-                }}
-              />
-              <div
-                style={{
-                  height: "200px",
-                  background: "#f0f0f0",
-                  borderRadius: "4px",
-                }}
-              />
+              <div style={{ height: "30px", background: "#f0f0f0", borderRadius: "4px", marginBottom: "20px" }} />
+              <div style={{ height: "220px", background: "#f0f0f0", borderRadius: "4px" }} />
             </div>
           </aside>
           <main className="plp-main">
             <div className="plp-grid">
-              {[...Array(12)].map((_, index) => (
-                <ProductCardSkeleton key={index} />
-              ))}
+              {[...Array(12)].map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
           </main>
         </div>
@@ -229,8 +200,8 @@ const ProductListingPage = () => {
     <div className="product-listing-page">
       <SEO
         title={pageTitle}
-        description={`${pageTitle} tai FireBite. Tim burger, ga ran, combo, do uong va dat mon nhanh.`}
-        keywords={`fast food, burger, ga ran, combo, ${pageTitle.toLowerCase()}`}
+        description={`${pageTitle} tại FireBite — tìm sản phẩm công nghệ chính hãng, giao hàng nhanh.`}
+        keywords={`${pageTitle.toLowerCase()}, mua sắm, công nghệ, FireBite`}
       />
 
       <Breadcrumb items={breadcrumbItems} />
@@ -246,7 +217,7 @@ const ProductListingPage = () => {
           <ProductToolbar
             totalProducts={filteredProducts.length}
             sortBy={sortBy}
-            onSortChange={setSortBy}
+            onSortChange={(val) => { setSortBy(val); setItemsToShow(12); }}
           />
 
           {displayedProducts.length > 0 ? (
@@ -259,20 +230,20 @@ const ProductListingPage = () => {
             </div>
           ) : (
             <div className="plp-empty">
-              <h3>Khong tim thay mon phu hop</h3>
-              <p>Hay doi bo loc hoac thu tu khoa khac.</p>
+              <h3>Không tìm thấy sản phẩm phù hợp</h3>
+              <p>Hãy đổi bộ lọc hoặc thử từ khóa khác.</p>
               <button className="clear-filter-btn" onClick={handleClearFilters}>
-                Xoa bo loc
+                Xóa bộ lọc
               </button>
             </div>
           )}
 
-          {displayedProducts.length > 0 && (
+          {filteredProducts.length > itemsToShow && (
             <LoadMoreButton
               currentCount={displayedProducts.length}
-              totalCount={sortedProducts.length}
+              totalCount={filteredProducts.length}
               onLoadMore={handleLoadMore}
-              isLoading={loadingMore}
+              isLoading={false}
             />
           )}
         </main>
