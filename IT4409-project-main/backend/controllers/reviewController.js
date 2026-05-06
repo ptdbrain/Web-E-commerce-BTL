@@ -82,6 +82,10 @@ export const createReview = async (req, res) => {
     const { rating, comment, userName } = req.body;
     const { productId } = req.params;
 
+    if (!mongoose.isValidObjectId(productId)) {
+      return res.status(400).json({ message: "productId không hợp lệ" });
+    }
+
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Số sao không hợp lệ (1-5)" });
     }
