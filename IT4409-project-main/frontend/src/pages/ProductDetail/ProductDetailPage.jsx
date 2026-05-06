@@ -11,7 +11,7 @@ import "./ProductDetailPage.css";
 export const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { success } = useToast();
+  const { success, error: toastError } = useToast();
   const {
     addToCart,
     setIsCartOpen,
@@ -23,18 +23,14 @@ export const ProductDetailPage = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [reviewList, setReviewList]         = useState([]);
-  const [reviewStats, setReviewStats]       = useState(null);
-  const [reviewSort, setReviewSort]         = useState("newest");
-  const [reviewPage, setReviewPage]         = useState(1);
+  const [reviewList, setReviewList]             = useState([]);
+  const [reviewStats, setReviewStats]           = useState(null);
+  const [reviewSort, setReviewSort]             = useState("newest");
+  const [reviewPage, setReviewPage]             = useState(1);
   const [reviewTotalPages, setReviewTotalPages] = useState(1);
-  const [reviewLoading, setReviewLoading]   = useState(false);
+  const [reviewLoading, setReviewLoading]       = useState(false);
 
-  const [reviewForm, setReviewForm] = useState({
-    guestName: "",
-    rating: 5,
-    comment: "",
-  });
+  const [reviewForm, setReviewForm] = useState({ guestName: "", rating: 5, comment: "" });
   const [reviewFormError, setReviewFormError] = useState("");
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
@@ -60,13 +56,11 @@ export const ProductDetailPage = () => {
       try {
         const data = await getProductById(id);
         setProduct(data);
-        setSelectedSize(
-          data?.sizes?.find((size) => size.isDefault) || data?.sizes?.[0] || null
-        );
+        setSelectedSize(data?.sizes?.find((s) => s.isDefault) || data?.sizes?.[0] || null);
         setSelectedAddons([]);
         setItemNote("");
-      } catch (error) {
-        console.error("Error fetching product:", error);
+      } catch (err) {
+        console.error("Error fetching product:", err);
       } finally {
         setLoading(false);
       }
@@ -80,12 +74,11 @@ export const ProductDetailPage = () => {
   }, [id, reviewSort, loadReviews]);
 
   const configuredPrice = useMemo(
-    () =>
-      calculateConfiguredUnitPrice({
-        newPrice: product?.newPrice || product?.price || 0,
-        selectedSize,
-        selectedAddons,
-      }),
+    () => calculateConfiguredUnitPrice({
+      newPrice: product?.newPrice || product?.price || 0,
+      selectedSize,
+      selectedAddons,
+    }),
     [product, selectedSize, selectedAddons]
   );
 
@@ -105,16 +98,15 @@ export const ProductDetailPage = () => {
   const handleToggleAddon = (addon) => {
     setSelectedAddons((prev) => {
       const exists = prev.some((item) => item.label === addon.label);
-      if (exists) {
-        return prev.filter((item) => item.label !== addon.label);
-      }
-      return [...prev, { ...addon, quantity: 1 }];
+      return exists
+        ? prev.filter((item) => item.label !== addon.label)
+        : [...prev, { ...addon, quantity: 1 }];
     });
   };
 
   const handleAddToCart = () => {
     addToCart(buildConfiguredItem());
-    success("Da them mon vao gio hang");
+    success("Đã thêm vào giỏ hàng!");
     setIsCartOpen(true);
   };
 
@@ -148,17 +140,17 @@ export const ProductDetailPage = () => {
       setReviewPage(1);
       await loadReviews(reviewSort, 1, false);
       success("Cảm ơn bạn đã đánh giá sản phẩm!");
-    } catch (error) {
-      setReviewFormError(error?.response?.data?.message || "Gửi đánh giá thất bại.");
+    } catch (err) {
+      toastError(err?.response?.data?.message || "Gửi đánh giá thất bại, vui lòng thử lại.");
     }
   };
 
   if (loading) {
     return (
       <div className="product-detail-loading">
-        <SEO title="Dang tai mon an..." />
+        <SEO title="Đang tải sản phẩm..." />
         <div className="spinner" />
-        <p>Dang tai thong tin mon an...</p>
+        <p>Đang tải thông tin sản phẩm...</p>
       </div>
     );
   }
@@ -166,9 +158,9 @@ export const ProductDetailPage = () => {
   if (!product) {
     return (
       <div className="product-detail-error">
-        <SEO title="Khong tim thay mon" />
-        <h2>Khong tim thay mon an</h2>
-        <a href="/">Quay ve trang chu</a>
+        <SEO title="Không tìm thấy sản phẩm" />
+        <h2>Không tìm thấy sản phẩm</h2>
+        <a href="/">Quay về trang chủ</a>
       </div>
     );
   }
@@ -176,14 +168,14 @@ export const ProductDetailPage = () => {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <SEO
-        title={`${product.name} - ${configuredPrice.toLocaleString("vi-VN")} d`}
+        title={`${product.name} - ${configuredPrice.toLocaleString("vi-VN")}đ`}
         description={product.description}
-        keywords={`fast food, ${product.name}, ${product.category?.name}, ${product.badges?.join(", ")}`}
+        keywords={`${product.name}, ${product.category?.name}, ${product.badges?.join(", ")}`}
         image={product.image}
       />
 
       <nav className="mb-6 text-sm text-slate-500">
-        <Link to="/">Trang chu</Link>
+        <Link to="/">Trang chủ</Link>
         <span className="mx-2">/</span>
         <Link to={`/products/${product.category?.slug}`}>{product.category?.name}</Link>
         <span className="mx-2">/</span>
@@ -191,6 +183,7 @@ export const ProductDetailPage = () => {
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+        {/* Ảnh + combo items */}
         <div>
           <img
             src={product.image}
@@ -199,15 +192,10 @@ export const ProductDetailPage = () => {
           />
           {product.comboItems?.length > 0 && (
             <div className="mt-6 rounded-[28px] border border-orange-100 bg-orange-50 p-5">
-              <h3 className="text-lg font-black text-slate-900">
-                Bao gom trong combo
-              </h3>
+              <h3 className="text-lg font-black text-slate-900">Bao gồm trong combo</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {product.comboItems.map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full bg-white px-3 py-1 text-sm text-slate-700"
-                  >
+                  <span key={item} className="rounded-full bg-white px-3 py-1 text-sm text-slate-700">
                     {item}
                   </span>
                 ))}
@@ -216,7 +204,9 @@ export const ProductDetailPage = () => {
           )}
         </div>
 
+        {/* Thông tin & hành động */}
         <div>
+          {/* Badges */}
           <div className="flex flex-wrap gap-2">
             {(product.badges || []).map((badge) => (
               <span
@@ -228,75 +218,75 @@ export const ProductDetailPage = () => {
             ))}
           </div>
 
-          <h1 className="mt-4 text-4xl font-black text-slate-900">
-            {product.name}
-          </h1>
+          <h1 className="mt-4 text-4xl font-black text-slate-900">{product.name}</h1>
           <p className="mt-3 text-lg text-slate-600">{product.description}</p>
 
-          <div className="mt-5 flex flex-wrap gap-4 text-sm text-slate-500">
-            <span>{product.preparationTime} phut</span>
+          {/* Meta: thời gian, danh mục, rating */}
+          <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+            {product.preparationTime > 0 && <span>{product.preparationTime} phút</span>}
             <span>{product.category?.name}</span>
-            <span>Danh gia {averageRating}/5</span>
-            <span>{product.reviewCount} reviews</span>
+            <span className="flex items-center gap-1">
+              <span className="text-orange-400">★</span>
+              <span className="font-medium text-slate-700">{averageRating.toFixed(1)}</span>
+              <span>({reviewStats?.total ?? product.reviewCount ?? 0} đánh giá)</span>
+            </span>
           </div>
 
+          {/* Giá */}
           <div className="mt-6 flex items-end gap-4">
             <div className="text-4xl font-black text-orange-600">
-              {configuredPrice.toLocaleString("vi-VN")} d
+              {configuredPrice.toLocaleString("vi-VN")}đ
             </div>
             {product.originalPrice > product.newPrice && (
               <div className="text-xl text-slate-400 line-through">
-                {product.originalPrice.toLocaleString("vi-VN")} d
+                {product.originalPrice.toLocaleString("vi-VN")}đ
               </div>
             )}
           </div>
 
+          {/* Chọn size */}
           {product.sizes?.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-lg font-black text-slate-900">Chon size</h2>
+              <h2 className="text-lg font-black text-slate-900">Chọn size</h2>
               <div className="mt-3 flex flex-wrap gap-3">
                 {product.sizes.map((size) => (
                   <button
                     key={size.label}
                     onClick={() => setSelectedSize(size)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
                       selectedSize?.label === size.label
                         ? "border-orange-600 bg-orange-600 text-white"
                         : "border-slate-200 text-slate-700 hover:border-orange-300"
                     }`}
                   >
                     {size.label}
-                    {size.priceModifier > 0 &&
-                      ` (+${size.priceModifier.toLocaleString("vi-VN")} d)`}
+                    {size.priceModifier > 0 && ` (+${size.priceModifier.toLocaleString("vi-VN")}đ)`}
                   </button>
                 ))}
               </div>
             </section>
           )}
 
+          {/* Thêm topping */}
           {product.addons?.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-lg font-black text-slate-900">Them topping</h2>
+              <h2 className="text-lg font-black text-slate-900">Thêm topping</h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {product.addons.map((addon) => {
-                  const active = selectedAddons.some(
-                    (item) => item.label === addon.label
-                  );
+                  const active = selectedAddons.some((item) => item.label === addon.label);
                   return (
                     <button
                       key={addon.label}
                       onClick={() => handleToggleAddon(addon)}
-                      className={`rounded-2xl border p-4 text-left ${
+                      className={`rounded-2xl border p-4 text-left transition-colors ${
                         active
                           ? "border-orange-600 bg-orange-50"
                           : "border-slate-200 hover:border-orange-300"
                       }`}
                     >
-                      <div className="font-semibold text-slate-900">
-                        {addon.label}
-                      </div>
+                      <div className="font-semibold text-slate-900">{addon.label}</div>
                       <div className="mt-1 text-sm text-slate-500">
-                        +{addon.price.toLocaleString("vi-VN")} d
+                        +{addon.price.toLocaleString("vi-VN")}đ
                       </div>
                     </button>
                   );
@@ -305,36 +295,39 @@ export const ProductDetailPage = () => {
             </section>
           )}
 
+          {/* Ghi chú */}
           <section className="mt-8">
-            <h2 className="text-lg font-black text-slate-900">Ghi chu mon</h2>
+            <h2 className="text-lg font-black text-slate-900">Ghi chú</h2>
             <textarea
               value={itemNote}
-              onChange={(event) => setItemNote(event.target.value)}
-              placeholder="Vi du: khong hanh tay, it sot, tach da..."
-              className="mt-3 w-full rounded-3xl border border-slate-200 p-4 outline-none focus:border-orange-400"
-              rows={4}
+              onChange={(e) => setItemNote(e.target.value)}
+              placeholder="Ví dụ: không hành tây, ít sốt, tách đá..."
+              className="mt-3 w-full rounded-3xl border border-slate-200 p-4 text-sm outline-none focus:border-orange-400"
+              rows={3}
             />
           </section>
 
+          {/* Hành động */}
           <div className="mt-8 flex flex-wrap gap-3">
             <button
               onClick={handleAddToCart}
-              className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+              className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
             >
-              Them vao gio hang
+              Thêm vào giỏ hàng
             </button>
             <button
               onClick={handleBuyNow}
-              className="rounded-full bg-orange-600 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-700"
+              className="rounded-full bg-orange-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
             >
-              Dat ngay
+              Đặt ngay
             </button>
           </div>
 
+          {/* Điểm nổi bật */}
           {product.highlights?.length > 0 && (
             <section className="mt-8 rounded-[28px] border border-slate-100 bg-white p-5">
-              <h2 className="text-lg font-black text-slate-900">Diem noi bat</h2>
-              <ul className="mt-3 space-y-2 text-slate-600">
+              <h2 className="text-lg font-black text-slate-900">Điểm nổi bật</h2>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
                 {product.highlights.map((item) => (
                   <li key={item}>• {item}</li>
                 ))}
@@ -344,38 +337,46 @@ export const ProductDetailPage = () => {
         </div>
       </div>
 
+      {/* Thông tin chi tiết + Đánh giá */}
       <div className="mt-10 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+        {/* Thông tin sản phẩm */}
         <section className="rounded-[28px] border border-slate-100 bg-white p-6">
-          <h2 className="text-2xl font-black text-slate-900">Thong tin mon</h2>
+          <h2 className="text-2xl font-black text-slate-900">Thông tin sản phẩm</h2>
           <div className="mt-4 space-y-3 text-sm text-slate-600">
-            {Object.entries(product.specifications || {}).map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between border-b border-slate-100 pb-3"
-              >
-                <span className="font-medium text-slate-500">{key}</span>
-                <span className="text-right font-semibold text-slate-800">
-                  {value}
-                </span>
-              </div>
-            ))}
+            {Object.keys(product.specifications || {}).length === 0 ? (
+              <p className="text-slate-400">Chưa có thông tin chi tiết.</p>
+            ) : (
+              Object.entries(product.specifications).map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between border-b border-slate-100 pb-3"
+                >
+                  <span className="font-medium text-slate-500">{key}</span>
+                  <span className="text-right font-semibold text-slate-800">{value}</span>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
+        {/* Đánh giá */}
         <section className="rounded-[28px] border border-slate-100 bg-white p-6">
           <h2 className="text-2xl font-black text-slate-900">Đánh giá sản phẩm</h2>
 
-          {/* Stats block */}
+          {/* Thống kê rating */}
           {reviewStats && (
             <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start">
-              {/* Average score */}
+              {/* Điểm trung bình */}
               <div className="flex flex-col items-center justify-center rounded-2xl bg-orange-50 px-8 py-5 text-center">
-                <span className="text-5xl font-black text-orange-600 leading-none">
+                <span className="text-5xl font-black leading-none text-orange-600">
                   {reviewStats.avg.toFixed(1)}
                 </span>
-                <div className="mt-2 flex text-xl text-orange-400">
+                <div className="mt-2 flex text-xl">
                   {Array.from({ length: 5 }, (_, i) => (
-                    <span key={i} className={i < Math.round(reviewStats.avg) ? "text-orange-400" : "text-slate-200"}>
+                    <span
+                      key={i}
+                      className={i < Math.round(reviewStats.avg) ? "text-orange-400" : "text-slate-200"}
+                    >
                       ★
                     </span>
                   ))}
@@ -383,7 +384,7 @@ export const ProductDetailPage = () => {
                 <span className="mt-1 text-xs text-slate-500">{reviewStats.total} đánh giá</span>
               </div>
 
-              {/* Distribution bars */}
+              {/* Thanh phân phối sao */}
               <div className="flex-1 space-y-2">
                 {[5, 4, 3, 2, 1].map((star) => {
                   const count = reviewStats.distribution[star] ?? 0;
@@ -405,12 +406,12 @@ export const ProductDetailPage = () => {
             </div>
           )}
 
-          {/* Sort buttons */}
+          {/* Nút lọc */}
           <div className="mt-5 flex flex-wrap gap-2">
             {[
               { value: "newest",  label: "Mới nhất" },
-              { value: "highest", label: "Tốt nhất ↓" },
-              { value: "lowest",  label: "Thấp nhất ↑" },
+              { value: "oldest",  label: "Cũ nhất" },
+              { value: "highest", label: "5★ trước" },
             ].map((opt) => (
               <button
                 key={opt.value}
@@ -426,7 +427,7 @@ export const ProductDetailPage = () => {
             ))}
           </div>
 
-          {/* Review list */}
+          {/* Danh sách đánh giá */}
           <div className="mt-5 space-y-4">
             {reviewLoading && reviewPage === 1 ? (
               <div className="py-8 text-center text-sm text-slate-400">Đang tải đánh giá...</div>
@@ -439,16 +440,23 @@ export const ProductDetailPage = () => {
                 <article key={review._id} className="rounded-2xl border border-slate-100 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900">{review.userName || "Khách"}</span>
+                      <span className="font-semibold text-slate-900">
+                        {review.userName || "Khách"}
+                      </span>
                       {review.isVerified && (
                         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
                           Đã mua
                         </span>
                       )}
                     </div>
-                    <div className="flex shrink-0 text-base text-orange-400">
+                    <div className="flex shrink-0 text-base">
                       {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} className={i < review.rating ? "text-orange-400" : "text-slate-200"}>★</span>
+                        <span
+                          key={i}
+                          className={i < review.rating ? "text-orange-400" : "text-slate-200"}
+                        >
+                          ★
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -463,18 +471,18 @@ export const ProductDetailPage = () => {
             )}
           </div>
 
-          {/* Load more */}
+          {/* Xem thêm */}
           {reviewPage < reviewTotalPages && (
             <button
               onClick={handleLoadMoreReviews}
               disabled={reviewLoading}
-              className="mt-4 w-full rounded-2xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:border-orange-300 hover:text-orange-600 disabled:opacity-50 transition-colors"
+              className="mt-4 w-full rounded-2xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:border-orange-300 hover:text-orange-600 disabled:opacity-50"
             >
               {reviewLoading ? "Đang tải..." : "Xem thêm đánh giá"}
             </button>
           )}
 
-          {/* Write review form */}
+          {/* Form viết đánh giá */}
           <div className="mt-8 rounded-[24px] bg-orange-50 p-5">
             <h3 className="text-lg font-black text-slate-900">Viết đánh giá</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -484,7 +492,7 @@ export const ProductDetailPage = () => {
                 placeholder="Tên của bạn (để trống nếu đã đăng nhập)"
                 className="rounded-2xl border border-orange-100 bg-white px-4 py-3 text-sm outline-none focus:border-orange-300"
               />
-              {/* Star rating selector */}
+              {/* Chọn sao */}
               <div className="flex items-center gap-1 rounded-2xl border border-orange-100 bg-white px-4 py-3">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
@@ -518,7 +526,7 @@ export const ProductDetailPage = () => {
             )}
             <button
               onClick={handleSubmitReview}
-              className="mt-3 rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 transition-colors"
+              className="mt-3 rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
             >
               Gửi đánh giá
             </button>
