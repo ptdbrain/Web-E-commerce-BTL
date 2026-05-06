@@ -19,27 +19,10 @@ export default function SearchBar() {
 
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      const products = await getProducts();
-      const query = q.trim().toLowerCase();
-      const filtered = products
-        .filter((product) => {
-          const haystack = [
-            product.name,
-            product.category?.name,
-            ...(product.highlights || []),
-            ...(product.badges || []),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-
-          return haystack.includes(query);
-        })
-        .slice(0, 6);
-
-      setResults(filtered);
+      const products = await getProducts({ search: q.trim() });
+      setResults(products.slice(0, 6));
       setOpen(true);
-    }, 180);
+    }, 300);
 
     return () => clearTimeout(timer.current);
   }, [q]);
