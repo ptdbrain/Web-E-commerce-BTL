@@ -120,7 +120,7 @@ const SORT_MAP = {
 export const getProducts = async (req, res) => {
   try {
     const {
-      search, searchRegex, categorySlug, itemTypes, spiceLevel,
+      search, searchRegex, categorySlug, itemTypes, spiceLevels,
       isAvailable, isFeatured, minPrice, maxPrice, sortBy, page, limit,
     } = buildProductFilter(req.query);
 
@@ -138,10 +138,11 @@ export const getProducts = async (req, res) => {
       baseFilter.category = cat._id;
     }
 
-    if (itemTypes.length === 1) baseFilter.itemType = itemTypes[0];
-    else if (itemTypes.length > 1) baseFilter.itemType = { $in: itemTypes };
+    if (itemTypes.length === 1)   baseFilter.itemType   = itemTypes[0];
+    else if (itemTypes.length > 1) baseFilter.itemType  = { $in: itemTypes };
 
-    if (spiceLevel) baseFilter.spiceLevel = spiceLevel;
+    if (spiceLevels.length === 1)   baseFilter.spiceLevel  = spiceLevels[0];
+    else if (spiceLevels.length > 1) baseFilter.spiceLevel = { $in: spiceLevels };
     if (isAvailable !== undefined) baseFilter.isAvailable = isAvailable;
     if (isFeatured) baseFilter.$or = [{ isBestSeller: true }, { isNew: true }];
 
