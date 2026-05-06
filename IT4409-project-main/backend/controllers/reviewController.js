@@ -67,13 +67,13 @@ export const getReviewsByProduct = async (req, res) => {
 };
 
 const recalculateProductRating = async (productId) => {
-  const reviews = await Review.find({ product_id: productId });
-  const avg = reviews.length
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-    : 0;
+  const [result] = await Review.aggregate([
+    { $match: { product_id: new mongoose.Types.ObjectId(productId) } },
+    { $group: { _id: null, avg: { $avg: "$rating" }, total: { $sum: 1 } } },
+  ]);
   await Product.findByIdAndUpdate(productId, {
-    rating: Number(avg.toFixed(1)),
-    numReviews: reviews.length,
+    rating: result ? Number(result.avg.toFixed(1)) : 0,
+    numReviews: result?.total ?? 0,
   });
 };
 
