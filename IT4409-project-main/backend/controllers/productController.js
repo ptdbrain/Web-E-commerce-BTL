@@ -152,26 +152,33 @@ export const getProducts = async (req, res) => {
       if (maxPrice !== undefined) baseFilter.discountPrice.$lte = maxPrice;
     }
 
-    // Search path: $text (với index) + merge category-name matches
+    // Search path: $text (với index) + fallback regex + merge category-name matches
     if (search) {
-      const textFilter = { ...baseFilter, $text: { $search: search } };
-
-      let textResults;
-      try {
-        textResults = await Product.find(textFilter)
-          .sort({ score: { $meta: "textScore" } })
-          .populate("category", "name slug")
-          .lean();
-      } catch {
-        // text index không khả dụng → fallback regex
-        const { $text, ...rest } = textFilter;
-        textResults = await Product.find({
-          ...rest,
-          $or: [{ name: searchRegex }, { description: searchRegex }],
+      const regexFallback = async (filter) =>
+        Product.find({
+          ...filter,
+          $or: [
+            { name: searchRegex },
+            { description: searchRegex },
+            { highlights: searchRegex },
+            { badges: searchRegex },
+          ],
         })
           .sort(sortOrder)
           .populate("category", "name slug")
           .lean();
+
+      let textResults;
+      try {
+        const tmp = await Product.find({ ...baseFilter, $text: { $search: search } })
+          .sort({ score: { $meta: "textScore" } })
+          .populate("category", "name slug")
+          .lean();
+        // $text trả 0: từ quá ngắn/không có trong index → dùng regex
+        textResults = tmp.length > 0 ? tmp : await regexFallback(baseFilter);
+      } catch {
+        // $text ném lỗi (index chưa có, ký tự đặc biệt...) → dùng regex
+        textResults = await regexFallback(baseFilter);
       }
 
       // Thêm sản phẩm thuộc category có tên/slug khớp search (không trùng textResults)
