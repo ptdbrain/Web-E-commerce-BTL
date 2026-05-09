@@ -9,14 +9,29 @@ export const normalizeCategory = (category = {}) => ({
   image: category.icon || category.image || "",
 });
 
+const USE_DATABASE_ONLY = import.meta.env?.VITE_USE_DATABASE_ONLY === "true";
+
 export const getCategories = async () => {
   try {
     const res = await axios.get(buildApiUrl("/categories"));
-    return Array.isArray(res.data)
-      ? res.data.map(normalizeCategory)
-      : fallbackCategories;
+    const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    
+    if (data.length > 0) {
+      console.log(`Fetched ${data.length} categories from database.`);
+      return data.map(normalizeCategory);
+    }
+    
+    // If empty data from backend, handle fallback below
+    if (USE_DATABASE_ONLY) return [];
+    
+    return fallbackCategories;
   } catch (error) {
-    console.warn("Using category fallback data:", error?.message || error);
+    if (USE_DATABASE_ONLY) {
+      console.error("Categories fetch failed and USE_DATABASE_ONLY is true:", error?.message);
+      throw error;
+    }
+    
+    console.warn("Using category fallback data (Backend/DB unavailable):", error?.message || error);
     return fallbackCategories;
   }
 };

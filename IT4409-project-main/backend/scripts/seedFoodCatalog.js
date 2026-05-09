@@ -274,6 +274,10 @@ const main = async () => {
 main()
   .then(() => {
     console.log("Seeded FireBite categories, menu items, and demo vouchers.");
+    console.log("---------------------------------------------------------");
+    console.log("DATABASE READY! You can now switch your frontend to use the DB.");
+    console.log("In frontend/.env, set: VITE_USE_DATABASE_ONLY=true");
+    console.log("---------------------------------------------------------");
     console.log(
       "Use `npm run seed:food -- --clean-related` to clear carts, reviews, and orders for a clean demo."
     );
