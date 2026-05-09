@@ -152,9 +152,9 @@ export const getProducts = async (req, res) => {
       if (maxPrice !== undefined) baseFilter.discountPrice.$lte = maxPrice;
     }
 
-    // Search path: $text (với index) + fallback regex + merge category-name matches
+    // Search path: regex (luôn chạy) + $text (nếu có, ưu tiên lên đầu) + category-name merge
     if (search) {
-      const regexFallback = async (filter) =>
+      const regexSearch = (filter) =>
         Product.find({
           ...filter,
           $or: [
@@ -168,18 +168,32 @@ export const getProducts = async (req, res) => {
           .populate("category", "name slug")
           .lean();
 
-      let textResults;
+      // Regex luôn chạy để đảm bảo không bỏ sót sản phẩm chứa ký tự tìm kiếm
+      const regexResults = await regexSearch(baseFilter);
+
+      let textResults = regexResults;
       try {
         const tmp = await Product.find({ ...baseFilter, $text: { $search: search } })
           .sort({ score: { $meta: "textScore" } })
           .populate("category", "name slug")
           .lean();
-        // $text trả 0: từ quá ngắn/không có trong index → dùng regex
-        textResults = tmp.length > 0 ? tmp : await regexFallback(baseFilter);
+        if (tmp.length > 0) {
+          // $text trả kết quả: merge, text lên đầu (relevance tốt hơn), regex bổ sung phần còn thiếu
+          const textIds = new Set(tmp.map((p) => String(p._id)));
+          textResults = [...tmp, ...regexResults.filter((p) => !textIds.has(String(p._id)))];
+        }
       } catch {
-        // $text ném lỗi (index chưa có, ký tự đặc biệt...) → dùng regex
-        textResults = await regexFallback(baseFilter);
+        // $text lỗi (index chưa tồn tại, ký tự đặc biệt...): chỉ dùng regex
       }
+
+      // Sắp xếp theo độ liên quan: tên bắt đầu bằng search → tên chứa search → còn lại
+      const q = search.toLowerCase();
+      textResults.sort((a, b) => {
+        const aName = (a.name || "").toLowerCase();
+        const bName = (b.name || "").toLowerCase();
+        const rank = (name) => (name.startsWith(q) ? 0 : name.includes(q) ? 1 : 2);
+        return rank(aName) - rank(bName);
+      });
 
       // Thêm sản phẩm thuộc category có tên/slug khớp search (không trùng textResults)
       let merged = textResults;

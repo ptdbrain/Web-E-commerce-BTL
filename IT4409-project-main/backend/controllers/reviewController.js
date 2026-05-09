@@ -86,6 +86,11 @@ export const createReview = async (req, res) => {
       return res.status(400).json({ message: "productId không hợp lệ" });
     }
 
+    const productExists = await Product.findById(productId).select("_id").lean();
+    if (!productExists) {
+      return res.status(404).json({ message: "Sản phẩm không tồn tại" });
+    }
+
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Số sao không hợp lệ (1-5)" });
     }

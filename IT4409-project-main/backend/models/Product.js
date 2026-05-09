@@ -148,7 +148,6 @@ const ProductSchema = new mongoose.Schema(
 );
 
 ProductSchema.index({ name: "text", description: "text" });
-ProductSchema.index({ slug: "text" });
 ProductSchema.index({ category: 1 });
 ProductSchema.index({ price: 1 });
 ProductSchema.index({ soldCount: -1 });

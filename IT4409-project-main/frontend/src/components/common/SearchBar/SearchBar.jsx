@@ -26,7 +26,11 @@ export default function SearchBar() {
     timer.current = setTimeout(async () => {
       try {
         const products = await getProducts({ search: q.trim() });
-        setResults(products.slice(0, 6));
+        const needle = q.trim().toLowerCase();
+        const prefixMatches = products.filter((p) =>
+          p.name.toLowerCase().startsWith(needle)
+        );
+        setResults(prefixMatches.slice(0, 6));
       } catch {
         setResults([]);
       } finally {
