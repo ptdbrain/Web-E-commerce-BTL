@@ -7,6 +7,8 @@ const CACHE_TTL = 5 * 60 * 1000;
 let productsCache = null;
 let productsCacheTime = 0;
 
+const USE_DATABASE_ONLY = import.meta.env?.VITE_USE_DATABASE_ONLY === "true";
+
 const hasQueryFilters = (query = {}) =>
   Object.values(query || {}).some(
     (value) =>
@@ -155,13 +157,26 @@ export const getProducts = async (queryOrForceRefresh = {}, forceRefresh = false
     const raw = response.data;
     const list = Array.isArray(raw) ? raw : (raw?.data ?? []);
     const products = list.map(normalizeProduct);
+    
     if (useCache) {
       productsCache = products;
       productsCacheTime = now;
     }
+    
+    if (products.length === 0 && !useCache) {
+      console.info("Backend returned empty product list for query:", query);
+    } else if (products.length > 0) {
+      console.log(`Fetched ${products.length} products from database.`);
+    }
+
     return products;
   } catch (error) {
-    console.warn("Using menu fallback data:", error?.message || error);
+    if (USE_DATABASE_ONLY) {
+      console.error("Database fetch failed and USE_DATABASE_ONLY is true:", error?.message);
+      throw error;
+    }
+
+    console.warn("Using menu fallback data (Backend/DB unavailable):", error?.message || error);
     const fallback = filterProductsFallback(fallbackProducts, query);
     if (useCache) {
       productsCache = fallback;
