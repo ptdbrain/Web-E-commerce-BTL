@@ -1,0 +1,20 @@
+{
+    "jdk.java.completion.commit.chars": [],
+
+    // Đường dẫn tới JDK 17 cho Java Language Server
+    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-17",
+
+    // Cấu hình runtime bổ sung
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-17",
+            "path": "C:\\Program Files\\Java\\jdk-17"
+        }
+    ],
+
+    // Log verbose để debug Language Server
+    "java.trace.server": "verbose",
+
+    // Tự động cập nhật project khi pom.xml/build.gradle thay đổi
+    "java.configuration.updateBuildConfiguration": "automatic"
+}
