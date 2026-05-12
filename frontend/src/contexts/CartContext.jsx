@@ -273,7 +273,7 @@ export function CartProvider({ children }) {
         customerName: formData.name,
         customerPhone: formData.phone,
         shippingAddress: formData.address,
-        paymentMethod,
+        paymentMethod: paymentMethod === "qr" ? "cash" : paymentMethod,
         voucherCode: voucherCode || undefined,
         items: selectedItems.map((item) => ({
           productId: item.id,
