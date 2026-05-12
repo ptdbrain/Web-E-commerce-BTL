@@ -6,6 +6,71 @@ import { CheckoutForm } from "../components/cart/CheckOutForm.jsx";
 import { OrderSummary } from "../components/cart/OrderSummary.jsx";
 import SEO from "../components/common/SEO";
 
+// Thông tin tài khoản ngân hàng cửa hàng (thay bằng thông tin thật)
+const BANK_INFO = {
+  bankId: "MB",
+  bankName: "MBBank",
+  accountNumber: "0394685128",
+  accountName: "TECH GEEKS STORE",
+  transferNote: "TECHGEEKS THANH TOAN",
+};
+
+function QRPaymentPanel({ total }) {
+  const qrUrl = `https://img.vietqr.io/image/${BANK_INFO.bankId}-${BANK_INFO.accountNumber}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(BANK_INFO.transferNote)}&accountName=${encodeURIComponent(BANK_INFO.accountName)}`;
+
+  return (
+    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <p className="text-sm font-semibold text-blue-800 mb-3 text-center">
+        Quét mã QR để thanh toán
+      </p>
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        {/* QR Code */}
+        <div className="flex-shrink-0 bg-white p-2 rounded-lg border border-blue-200 shadow-sm">
+          <img
+            src={qrUrl}
+            alt="QR thanh toán"
+            className="w-44 h-44 object-contain"
+            onError={(e) => {
+              e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                `Bank:${BANK_INFO.bankName} Acc:${BANK_INFO.accountNumber} Amount:${total} Msg:${BANK_INFO.transferNote}`
+              )}`;
+            }}
+          />
+        </div>
+
+        {/* Bank info */}
+        <div className="text-sm space-y-2 flex-1">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Ngân hàng</span>
+            <span className="font-semibold">{BANK_INFO.bankName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Số tài khoản</span>
+            <span className="font-mono font-bold tracking-wider">{BANK_INFO.accountNumber}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Chủ tài khoản</span>
+            <span className="font-semibold">{BANK_INFO.accountName}</span>
+          </div>
+          <div className="flex justify-between border-t pt-2 mt-2">
+            <span className="text-gray-500">Số tiền</span>
+            <span className="font-bold text-red-600 text-base">
+              {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(total)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Nội dung CK</span>
+            <span className="font-semibold text-blue-700">{BANK_INFO.transferNote}</span>
+          </div>
+          <p className="text-xs text-orange-600 bg-orange-50 rounded p-2 mt-2">
+            Vui lòng chuyển đúng số tiền và nội dung. Đơn hàng sẽ được xác nhận sau khi chuyển khoản thành công.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CheckoutPage() {
   const {
     cartItems,
@@ -23,6 +88,16 @@ export default function CheckoutPage() {
     setVoucherResult,
   } = useCart();
   const navigate = useNavigate();
+
+  // Tính tổng tiền để truyền vào QR
+  const _selectedItems =
+    directCheckoutItems && directCheckoutItems.length > 0
+      ? directCheckoutItems
+      : cartItems.filter((item) => selectedItemIds.includes(item.id));
+  const _subtotal = _selectedItems.reduce((acc, item) => acc + item.newPrice * item.quantity, 0);
+  const _discount = voucherResult?.discountAmount || 0;
+  const _shippingFee = _subtotal > 0 ? 30000 : 0;
+  const orderTotal = Math.max(_subtotal - _discount, 0) + _shippingFee;
   const [voucherError, setVoucherError] = useState("");
   const [applying, setApplying] = useState(false);
   const [availableVouchers, setAvailableVouchers] = useState([]);
@@ -192,7 +267,21 @@ export default function CheckoutPage() {
                       />
                       <span>Thanh toán qua ZaloPay</span>
                     </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="qr"
+                        checked={paymentMethod === "qr"}
+                        onChange={() => setPaymentMethod("qr")}
+                      />
+                      <span>Chuyển khoản ngân hàng (QR)</span>
+                    </label>
                   </div>
+
+                  {paymentMethod === "qr" && (
+                    <QRPaymentPanel total={orderTotal} />
+                  )}
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg border">
