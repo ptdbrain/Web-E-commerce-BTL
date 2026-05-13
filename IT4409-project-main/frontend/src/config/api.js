@@ -1,3 +1,4 @@
+// Đọc base URL từ biến môi trường Vite, fallback về localhost khi dev
 const viteApiBaseUrl =
   typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_BASE_URL : "";
 
