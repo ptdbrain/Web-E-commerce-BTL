@@ -1,0 +1,111 @@
+.checkout-container {
+    display: flex;
+    gap: 40px;
+    padding: 40px 32px;
+}
+
+.checkout-form {
+    flex: 1;
+}
+
+.checkout-form h2 {
+    margin-bottom: 20px;
+    margin-top: 32px;
+}
+
+.checkout-form h2:first-child {
+    margin-top: 0;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 15px;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.payment-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.payment-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.payment-option input {
+    width: auto;
+}
+
+.btn-order {
+    width: 100%;
+    padding: 14px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.order-summary {
+    width: 320px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 24px;
+    height: fit-content;
+}
+
+.order-summary h2 {
+    margin-bottom: 20px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 15px;
+}
+
+.summary-item.total {
+    font-weight: bold;
+    font-size: 18px;
+    color: #e74c3c;
+    margin-top: 12px;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 12px 0;
+}
