@@ -1,11 +1,12 @@
 import ChatMessage from "../models/ChatMessage.js";
 import ChatSupport from "../models/ChatSupport.js";
+import Order from "../models/Order.js";
 import User from "../models/user.js";
 
 export const sendChatMessage = async (req, res) => {
   try {
     const userId = req.user?.id;
-    const { message } = req.body;
+    const { message, orderId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ message: "Bạn cần đăng nhập." });
@@ -15,9 +16,19 @@ export const sendChatMessage = async (req, res) => {
       return res.status(400).json({ message: "Nội dung tin nhắn không hợp lệ." });
     }
 
+    let linkedOrderId = null;
+    if (orderId) {
+      const order = await Order.findOne({ _id: orderId, customerId: userId }).select("_id");
+      if (!order) {
+        return res.status(404).json({ message: "Khong tim thay don hang de ho tro." });
+      }
+      linkedOrderId = order._id;
+    }
+
     // Lưu tin nhắn của người dùng, không gọi AI
     const userMsg = await ChatMessage.create({
       user: userId,
+      order: linkedOrderId,
       role: "user",
       content: message,
       isReadByAdmin: false,
@@ -28,6 +39,7 @@ export const sendChatMessage = async (req, res) => {
         id: userMsg._id,
         role: userMsg.role,
         content: userMsg.content,
+        orderId: userMsg.order,
         createdAt: userMsg.createdAt,
       },
     });
@@ -96,6 +108,10 @@ export const getConversationsForAdmin = async (req, res) => {
           email: user.email,
           lastMessage: c.lastMessage.content,
           lastRole: c.lastMessage.role,
+          lastOrderId: c.lastMessage.order || null,
+          lastOrderCode: c.lastMessage.order
+            ? c.lastMessage.order.toString().slice(-8).toUpperCase()
+            : null,
           lastAt: c.lastMessage.createdAt,
           currentAdminId: currentAdmin?._id || null,
           currentAdminName,
@@ -140,6 +156,8 @@ export const getChatHistoryForAdmin = async (req, res) => {
         id: m._id,
         role: m.role,
         content: m.content,
+        orderId: m.order || null,
+        orderCode: m.order ? m.order.toString().slice(-8).toUpperCase() : null,
         createdAt: m.createdAt,
       })),
     });
@@ -314,6 +332,8 @@ export const getChatHistory = async (req, res) => {
         id: m._id,
         role: m.role,
         content: m.content,
+        orderId: m.order || null,
+        orderCode: m.order ? m.order.toString().slice(-8).toUpperCase() : null,
         createdAt: m.createdAt,
       })),
     });
