@@ -27,7 +27,7 @@ export default function LoginPage() {
       localStorage.setItem("token", token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       window.dispatchEvent(new Event("authChanged"));
-      navigate("/");
+      navigate(user?.role === "admin" ? "/admin" : "/");
     } catch (err) {
       setError(err?.response?.data?.message || "Đăng nhập thất bại");
     } finally {

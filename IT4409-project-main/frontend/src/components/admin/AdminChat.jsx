@@ -214,6 +214,11 @@ export default function AdminChat() {
                   {conversation.lastMessage}
                 </div>
                 <div className="mt-2 space-y-1 text-[11px] text-slate-400">
+                  {conversation.lastOrderCode ? (
+                    <div className="font-semibold text-orange-600">
+                      Don #{conversation.lastOrderCode}
+                    </div>
+                  ) : null}
                   <div>
                     {conversation.lastAt
                       ? new Date(conversation.lastAt).toLocaleString()
@@ -255,6 +260,11 @@ export default function AdminChat() {
                   <div className="text-xs text-slate-500">
                     ID: {selectedUserInfo.userId}
                   </div>
+                  {selectedUserInfo.lastOrderCode ? (
+                    <div className="mt-1 text-xs font-semibold text-orange-600">
+                      Dang co cau hoi ve don #{selectedUserInfo.lastOrderCode}
+                    </div>
+                  ) : null}
                   {selectedUserInfo.currentAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
                       Dang duoc ho tro boi: {selectedUserInfo.currentAdminName}
@@ -315,6 +325,11 @@ export default function AdminChat() {
                       : "rounded-br-md bg-gradient-to-r from-orange-500 to-rose-500 text-white"
                   }`}
                 >
+                  {message.orderCode ? (
+                    <div className="mb-1 text-[10px] font-semibold uppercase opacity-75">
+                      Don #{message.orderCode}
+                    </div>
+                  ) : null}
                   {message.content}
                 </div>
               </div>

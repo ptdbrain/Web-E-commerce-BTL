@@ -6,8 +6,13 @@ export async function fetchChatHistory() {
   return Array.isArray(res.data?.messages) ? res.data.messages : [];
 }
 
-export async function sendChatMessage(message) {
-  const res = await axios.post(buildApiUrl("/chat"), { message });
+export async function sendChatMessage(message, options = {}) {
+  const payload = { message };
+  if (options.orderId) {
+    payload.orderId = options.orderId;
+  }
+
+  const res = await axios.post(buildApiUrl("/chat"), payload);
   return res.data?.message || null;
 }
 

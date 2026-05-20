@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FiEye, FiPackage, FiRotateCcw } from "react-icons/fi";
+import { FiEye, FiMessageSquare, FiPackage, FiRotateCcw } from "react-icons/fi";
 import { buildApiUrl } from "../config/api";
 import OrderDetailPopup from "../components/order/OrderDetailPopup";
 import SEO from "../components/common/SEO";
@@ -98,6 +98,17 @@ export default function OrderPage() {
     }
   };
 
+  const handleAskAboutOrder = (order) => {
+    window.dispatchEvent(
+      new CustomEvent("openOrderChat", {
+        detail: {
+          orderId: order._id,
+          orderCode: order._id.slice(-8).toUpperCase(),
+        },
+      })
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50/40 to-slate-50 py-10 px-4">
       <SEO title="Đơn hàng của tôi" description="Theo dõi và quản lý đơn hàng." />
@@ -178,6 +189,13 @@ export default function OrderPage() {
                   >
                     <FiEye size={13} />
                     Chi tiết
+                  </button>
+                  <button
+                    onClick={() => handleAskAboutOrder(order)}
+                    className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100 transition-colors"
+                  >
+                    <FiMessageSquare size={13} />
+                    Hoi ve don
                   </button>
                   {order.orderStatus === "shipping" && (
                     <>
