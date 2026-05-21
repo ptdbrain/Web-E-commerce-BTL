@@ -3,6 +3,7 @@ import { buildApiUrl } from "../config/api.js";
 import { featuredProductIds, menuProducts } from "../data/menuData.js";
 import { getSlugFromCategoryName } from "../data/categories.js";
 
+// Cache sản phẩm 5 phút để giảm số lần gọi API
 const CACHE_TTL = 5 * 60 * 1000;
 let productsCache = null;
 let productsCacheTime = 0;
