@@ -1,3 +1,5 @@
+// Sidebar bộ lọc sản phẩm
+// Hỗ trợ lọc theo: khoảng giá, loại món, độ cay, đánh giá, nổi bật, còn hàng
 import React from "react";
 import "./FilterSidebar.css";
 

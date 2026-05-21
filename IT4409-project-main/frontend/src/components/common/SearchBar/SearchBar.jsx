@@ -1,3 +1,6 @@
+// Thanh tìm kiếm có gợi ý (typeahead)
+// - Debounce 300ms, chỉ hiện sản phẩm có tên bắt đầu bằng từ khóa
+// - Nhấn Enter hoặc "Xem tất cả" sẽ chuyển sang trang /products
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiSearch, FiCornerDownLeft } from "react-icons/fi";

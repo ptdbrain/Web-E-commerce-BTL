@@ -1,3 +1,6 @@
+// Controller xử lý đánh giá sản phẩm
+// - getReviewsByProduct: lấy danh sách review kèm thống kê (avg, phân phối sao)
+// - createReview: tạo review mới, tự cập nhật rating sản phẩm sau khi lưu
 import mongoose from "mongoose";
 import Review from "../models/Review.js";
 import Product from "../models/Product.js";
