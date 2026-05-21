@@ -1,3 +1,4 @@
+// Model sản phẩm: lưu thông tin món ăn gồm tên, giá, danh mục, hình ảnh, đánh giá
 import mongoose from "mongoose";
 
 const ProductSchema = new mongoose.Schema(
