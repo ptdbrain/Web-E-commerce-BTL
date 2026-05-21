@@ -1,3 +1,5 @@
+// Controller sản phẩm: CRUD + tìm kiếm + lọc + sắp xếp
+// Tìm kiếm dùng regex (luôn chạy) kết hợp $text index, sort theo relevance
 import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
