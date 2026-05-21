@@ -1,3 +1,4 @@
+// Trang danh sách sản phẩm: hỗ trợ tìm kiếm, lọc và sắp xếp server-side
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import Breadcrumb from "../../components/common/Breadcrumb";
