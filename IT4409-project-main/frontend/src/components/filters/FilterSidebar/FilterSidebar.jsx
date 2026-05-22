@@ -31,11 +31,13 @@ const RATING_OPTIONS = [
   { value: 2, label: "Từ 2★ trở lên" },
 ];
 
+// Thêm hoặc bỏ giá trị khỏi mảng filter (dùng cho multi-select)
 const toggleValue = (values, target) =>
   values.includes(target)
     ? values.filter((v) => v !== target)
     : [...values, target];
 
+// So sánh 2 khoảng giá có giống nhau không
 const samePriceRange = (a, b) => a?.min === b?.min && a?.max === b?.max;
 
 const FilterSidebar = ({ filters, onFilterChange, onClearFilters }) => {

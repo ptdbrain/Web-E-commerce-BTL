@@ -10,16 +10,19 @@ const toBoolean = (value) => {
   return undefined;
 };
 
+// Chuyển string thành số nguyên dương, trả fallback nếu không hợp lệ
 const toPositiveInt = (value, fallback) => {
   const n = parseInt(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
+// Chuyển string thành số thực không âm, trả undefined nếu không hợp lệ
 const toNonNegativeFloat = (value) => {
   const n = parseFloat(value);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 };
 
+// Escape ký tự đặc biệt trong regex để tránh lỗi injection
 const escapeRegExp = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
