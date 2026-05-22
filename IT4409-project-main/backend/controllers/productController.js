@@ -154,7 +154,7 @@ export const getProducts = async (req, res) => {
       if (maxPrice !== undefined) baseFilter.discountPrice.$lte = maxPrice;
     }
 
-    // Search path: regex (luôn chạy) + $text (nếu có, ưu tiên lên đầu) + category-name merge
+    // Tìm kiếm: regex luôn chạy để không bỏ sót, $text bổ sung nếu có index
     if (search) {
       const regexSearch = (filter) =>
         Product.find({

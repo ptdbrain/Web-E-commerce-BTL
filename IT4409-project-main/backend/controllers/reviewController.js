@@ -69,6 +69,7 @@ export const getReviewsByProduct = async (req, res) => {
   }
 };
 
+// Tính lại rating trung bình và tổng số review sau mỗi lần tạo mới
 const recalculateProductRating = async (productId) => {
   const [result] = await Review.aggregate([
     { $match: { product_id: new mongoose.Types.ObjectId(productId) } },
