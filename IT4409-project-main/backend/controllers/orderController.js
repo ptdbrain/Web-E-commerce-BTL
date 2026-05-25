@@ -2,14 +2,112 @@ import mongoose from "mongoose";
 import Order, {
   EOrderStatus,
   EPaymentMethod,
+  EPaymentStatus,
 } from "../models/Order.js";
+import Product from "../models/Product.js";
 import Voucher from "../models/Voucher.js";
 import { createZaloPayOrder } from "../config/zalopay.js";
 import { calculateVoucherForItems } from "./voucherController.js";
+import { normalizeFulfillmentPayload } from "../utils/menuDomain.js";
 import {
-  normalizeFulfillmentPayload,
-  normalizeOrderItem,
-} from "../utils/menuDomain.js";
+  buildVoucherPricingItems,
+  priceOrderItemsFromProducts,
+} from "../utils/orderPricing.js";
+import {
+  getAdminOrderActionLabel,
+  getAdminOrderAdvance,
+} from "../utils/orderWorkflow.js";
+
+const getProductIdsFromItems = (items = []) =>
+  [
+    ...new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => String(item.productId || item.id || item._id || ""))
+        .filter((productId) => mongoose.isValidObjectId(productId))
+    ),
+  ];
+
+const loadProductsForOrderItems = async (items = []) => {
+  const productIds = getProductIdsFromItems(items);
+  if (productIds.length === 0) return [];
+  return Product.find({ _id: { $in: productIds } }).lean();
+};
+
+const releaseInventoryForItems = async (items = []) => {
+  const writes = (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter(
+      (item) => mongoose.isValidObjectId(item.productId) && item.quantity > 0
+    )
+    .map((item) => ({
+      updateOne: {
+        filter: { _id: item.productId },
+        update: {
+          $inc: {
+            stock: item.quantity,
+            soldCount: -item.quantity,
+          },
+        },
+      },
+    }));
+
+  if (writes.length > 0) {
+    await Product.bulkWrite(writes);
+  }
+};
+
+const reserveInventoryForItems = async (items = []) => {
+  const reservedItems = [];
+
+  for (const item of items) {
+    const result = await Product.updateOne(
+      {
+        _id: item.productId,
+        stock: { $gte: item.quantity },
+        isActive: { $ne: false },
+        isAvailable: { $ne: false },
+      },
+      {
+        $inc: {
+          stock: -item.quantity,
+          soldCount: item.quantity,
+        },
+      }
+    );
+
+    if (result.modifiedCount !== 1) {
+      await releaseInventoryForItems(reservedItems);
+      throw new Error(
+        `Product ${item.productName || item.productId} has not enough stock`
+      );
+    }
+
+    reservedItems.push(item);
+  }
+};
+
+const countVoucherUsage = async (order) => {
+  if (!order?.voucherId || order.voucherUsageCounted) return;
+  await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usedCount: 1 } });
+  order.voucherUsageCounted = true;
+};
+
+const releaseVoucherUsage = async (order) => {
+  if (!order?.voucherId || !order.voucherUsageCounted) return;
+  await Voucher.findByIdAndUpdate(order.voucherId, {
+    $inc: { usedCount: -1 },
+  });
+  order.voucherUsageCounted = false;
+};
+
+const releaseOrderReservations = async (order) => {
+  if (!order || !order.stockReserved || order.stockReleased) return;
+  await releaseInventoryForItems(order.items || []);
+  order.stockReleased = true;
+};
 
 export const createOrder = async (req, res) => {
   try {
@@ -40,16 +138,8 @@ export const createOrder = async (req, res) => {
 
     const fulfillment = normalizeFulfillmentPayload(req.body || {});
 
-    const normalizedItems = items.map((item) => {
-      const normalized = normalizeOrderItem(item);
-      if (!normalized.productId || !mongoose.isValidObjectId(normalized.productId)) {
-        throw new Error("Invalid productId in items");
-      }
-      if (!normalized.productName) {
-        throw new Error("productName is required in items");
-      }
-      return normalized;
-    });
+    const products = await loadProductsForOrderItems(items);
+    const normalizedItems = priceOrderItemsFromProducts(items, products);
 
     const itemsSubtotal = normalizedItems.reduce(
       (sum, item) => sum + item.lineTotal,
@@ -66,12 +156,7 @@ export const createOrder = async (req, res) => {
       const voucherResult = await calculateVoucherForItems({
         userId: customerId,
         code: voucherCode,
-        items: normalizedItems.map((item) => ({
-          productId: item.productId,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          lineTotal: item.lineTotal,
-        })),
+        items: buildVoucherPricingItems(normalizedItems),
         orderTotal: originalTotalPrice,
         deliveryFee: fulfillment.deliveryFee,
         fulfillmentType: fulfillment.fulfillmentType,
@@ -99,6 +184,10 @@ export const createOrder = async (req, res) => {
       resolvedPaymentMethod === EPaymentMethod.Zalopay
         ? EOrderStatus.WaitingForPayment
         : EOrderStatus.Pending;
+    const paymentStatus =
+      resolvedPaymentMethod === EPaymentMethod.Zalopay
+        ? EPaymentStatus.Waiting
+        : EPaymentStatus.Unpaid;
 
     if (resolvedPaymentMethod === EPaymentMethod.Zalopay) {
       try {
@@ -129,33 +218,42 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    const order = await Order.create({
-      customerId,
-      customerName,
-      customerPhone,
-      customerEmail,
-      items: normalizedItems,
-      orderStatus,
-      paymentMethod: resolvedPaymentMethod,
-      fulfillmentType: fulfillment.fulfillmentType,
-      shippingAddress: fulfillment.shippingAddress,
-      pickupTime: fulfillment.pickupTime,
-      tableBooking: fulfillment.tableBooking,
-      note,
-      deliveryFee: fulfillment.deliveryFee,
-      totalPrice: finalTotalPrice,
-      originalTotalPrice,
-      discountAmount,
-      voucherCode: appliedVoucherCode,
-      voucherId: appliedVoucherId,
-      zaloPayAppTransId,
-    });
+    await reserveInventoryForItems(normalizedItems);
 
-    if (appliedVoucherId) {
+    let order;
+    try {
+      order = await Order.create({
+        customerId,
+        customerName,
+        customerPhone,
+        customerEmail,
+        items: normalizedItems,
+        orderStatus,
+        paymentStatus,
+        paymentMethod: resolvedPaymentMethod,
+        fulfillmentType: fulfillment.fulfillmentType,
+        shippingAddress: fulfillment.shippingAddress,
+        pickupTime: fulfillment.pickupTime,
+        tableBooking: fulfillment.tableBooking,
+        note,
+        deliveryFee: fulfillment.deliveryFee,
+        totalPrice: finalTotalPrice,
+        originalTotalPrice,
+        discountAmount,
+        voucherCode: appliedVoucherCode,
+        voucherId: appliedVoucherId,
+        zaloPayAppTransId,
+        stockReserved: true,
+      });
+    } catch (createErr) {
+      await releaseInventoryForItems(normalizedItems);
+      throw createErr;
+    }
+
+    if (appliedVoucherId && resolvedPaymentMethod !== EPaymentMethod.Zalopay) {
       try {
-        await Voucher.findByIdAndUpdate(appliedVoucherId, {
-          $inc: { usedCount: 1 },
-        });
+        await countVoucherUsage(order);
+        await order.save();
       } catch (usageErr) {
         console.error("Failed to increment voucher usedCount", usageErr);
       }
@@ -166,6 +264,10 @@ export const createOrder = async (req, res) => {
     const message = err?.message || "Server error";
     if (
       message.includes("Invalid") ||
+      message.includes("not found") ||
+      message.includes("not available") ||
+      message.includes("stock") ||
+      message.includes("exceeds") ||
       message.includes("required") ||
       message.includes("Missing") ||
       message.includes("Unsupported")
@@ -322,7 +424,14 @@ export const cancelOrder = async (req, res) => {
       return res.status(400).json({ message: "Order already cancelled" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Cancelled;
+    if (order.paymentStatus === EPaymentStatus.Waiting) {
+      order.paymentStatus = EPaymentStatus.Failed;
+    } else if (order.paymentStatus === EPaymentStatus.Paid) {
+      order.paymentStatus = EPaymentStatus.Refunded;
+    }
     await order.save();
 
     return res.json({ order });
@@ -345,20 +454,35 @@ export const confirmOrderByAdmin = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (
-      ![EOrderStatus.Pending, EOrderStatus.Confirmed].includes(order.orderStatus)
-    ) {
+    const nextStatus = getAdminOrderAdvance(
+      order.orderStatus,
+      order.fulfillmentType
+    );
+    const actionLabel = getAdminOrderActionLabel(
+      order.orderStatus,
+      order.fulfillmentType
+    );
+
+    if (!nextStatus) {
       return res
         .status(400)
         .json({ message: "Khong the xac nhan don hang o trang thai nay" });
     }
 
-    order.orderStatus = EOrderStatus.Shipping;
+    order.orderStatus = nextStatus;
+    if (
+      nextStatus === EOrderStatus.Confirmed &&
+      order.paymentMethod === EPaymentMethod.Cash
+    ) {
+      order.paymentStatus = EPaymentStatus.Paid;
+    }
     await order.save();
 
     return res.json({
       order,
-      message: "Don hang da duoc xac nhan va dang duoc xu ly",
+      message: actionLabel
+        ? `${actionLabel} thanh cong`
+        : "Da cap nhat trang thai don hang",
     });
   } catch (err) {
     console.error("confirmOrderByAdmin error:", err);
@@ -383,7 +507,14 @@ export const cancelOrderByAdmin = async (req, res) => {
       return res.status(400).json({ message: "Don hang da bi huy roi" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Cancelled;
+    if (order.paymentStatus === EPaymentStatus.Paid) {
+      order.paymentStatus = EPaymentStatus.Refunded;
+    } else if (order.paymentStatus === EPaymentStatus.Waiting) {
+      order.paymentStatus = EPaymentStatus.Failed;
+    }
     await order.save();
 
     return res.json({ order, message: "Don hang da duoc huy" });
@@ -417,6 +548,9 @@ export const receiveOrder = async (req, res) => {
     }
 
     order.orderStatus = EOrderStatus.Confirmed;
+    if (order.paymentMethod === EPaymentMethod.Cash) {
+      order.paymentStatus = EPaymentStatus.Paid;
+    }
     await order.save();
 
     return res.json({ order, message: "Da xac nhan hoan tat don hang" });
@@ -449,7 +583,10 @@ export const refundOrder = async (req, res) => {
         .json({ message: "Chi co the yeu cau hoan tien khi don dang xu ly" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Refunded;
+    order.paymentStatus = EPaymentStatus.Refunded;
     await order.save();
 
     return res.json({ order, message: "Da yeu cau hoan tien thanh cong" });

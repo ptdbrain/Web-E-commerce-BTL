@@ -7,6 +7,11 @@ export const verifyCaptcha = async (req, res, next) => {
       return next();
     }
 
+    const secret = process.env.RECAPTCHA_SECRET;
+    if (!secret && process.env.NODE_ENV !== "production") {
+      return next();
+    }
+
     const { captchaToken } = req.body || {};
 
     if (!captchaToken) {
@@ -16,7 +21,6 @@ export const verifyCaptcha = async (req, res, next) => {
       });
     }
 
-    const secret = process.env.RECAPTCHA_SECRET;
     if (!secret) {
       // Không có secret => coi như cấu hình sai, tránh cho qua trong production
       return res.status(500).json({

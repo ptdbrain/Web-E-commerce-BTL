@@ -4,7 +4,7 @@ import SEO from "../../components/common/SEO";
 import { getProductById } from "../../api/productsApi.js";
 import { createReview, getReviews } from "../../api/reviewApi";
 import { useCart } from "../../hooks/useCart";
-import { useToast } from "../../contexts/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { calculateConfiguredUnitPrice } from "../../utils/cartItem.js";
 import "./ProductDetailPage.css";
 

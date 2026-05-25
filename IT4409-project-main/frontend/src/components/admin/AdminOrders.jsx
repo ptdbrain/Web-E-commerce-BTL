@@ -17,6 +17,8 @@ import {
   getFulfillmentColor,
   getFulfillmentLabel,
   getPaymentLabel,
+  getPaymentStatusColor,
+  getPaymentStatusLabel,
   getStatusColor,
   getStatusLabel,
 } from "./utils";
@@ -25,6 +27,8 @@ const statusFilters = [
   { value: "all", label: "Tat ca" },
   { value: "waiting_for_payment", label: "Cho thanh toan" },
   { value: "pending", label: "Cho xu ly" },
+  { value: "preparing", label: "Dang che bien" },
+  { value: "ready", label: "San sang giao" },
   { value: "shipping", label: "Dang phuc vu" },
   { value: "confirmed", label: "Hoan tat" },
   { value: "cancelled", label: "Da huy" },
@@ -53,9 +57,21 @@ const getFulfillmentDetail = (order) => {
   return order.shippingAddress || "Chua co dia chi giao hang";
 };
 
-const canConfirmOrder = (status) => ["pending", "confirmed"].includes(status);
+const canConfirmOrder = (status) =>
+  ["pending", "preparing", "ready", "shipping"].includes(status);
 const canCancelOrder = (status) =>
   !["cancelled", "confirmed", "refunded"].includes(status);
+
+const getConfirmActionLabel = (order) => {
+  if (order.orderStatus === "pending") return "Chuyen bep";
+  if (order.orderStatus === "preparing") {
+    return order.fulfillmentType === "delivery" ? "Chuyen giao hang" : "San sang giao mon";
+  }
+  if (order.orderStatus === "ready" || order.orderStatus === "shipping") {
+    return "Hoan tat don";
+  }
+  return "Cap nhat don";
+};
 
 export const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -127,7 +143,9 @@ export const AdminOrders = () => {
     () => ({
       total: orders.length,
       processing: orders.filter((order) =>
-        ["waiting_for_payment", "pending", "shipping"].includes(order.orderStatus)
+        ["waiting_for_payment", "pending", "preparing", "ready", "shipping"].includes(
+          order.orderStatus
+        )
       ).length,
       delivery: orders.filter((order) => order.fulfillmentType === "delivery").length,
       dineIn: orders.filter((order) => order.fulfillmentType === "dine_in").length,
@@ -142,7 +160,7 @@ export const AdminOrders = () => {
     setActingId(orderId);
 
     try {
-      await axios.put(
+      const response = await axios.put(
         buildApiUrl(`/orders/${orderId}/confirm`),
         {},
         {
@@ -152,7 +170,7 @@ export const AdminOrders = () => {
 
       setOrders((prev) =>
         prev.map((order) =>
-          order._id === orderId ? { ...order, orderStatus: "shipping" } : order
+          order._id === orderId ? { ...order, ...(response.data?.order || {}) } : order
         )
       );
     } catch (err) {
@@ -341,6 +359,11 @@ export const AdminOrders = () => {
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                       {getPaymentLabel(order.paymentMethod)}
                     </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}
+                    >
+                      {getPaymentStatusLabel(order.paymentStatus)}
+                    </span>
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
@@ -401,7 +424,7 @@ export const AdminOrders = () => {
                       {formatPriceAdmin(order.totalPrice)}
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      {(order.items || []).length} mon • {getPaymentLabel(order.paymentMethod)}
+                      {(order.items || []).length} mon - {getPaymentLabel(order.paymentMethod)}
                     </div>
                   </div>
 
@@ -426,7 +449,7 @@ export const AdminOrders = () => {
                         ) : (
                           <Check size={16} />
                         )}
-                        Xac nhan va chuyen xu ly
+                        {getConfirmActionLabel(order)}
                       </button>
                     ) : null}
 

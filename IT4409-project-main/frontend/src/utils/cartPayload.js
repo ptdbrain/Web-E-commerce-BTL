@@ -57,6 +57,8 @@ export const buildVoucherItemPayload = (item = {}) => {
     quantity,
     unitPrice,
     lineTotal: unitPrice * quantity,
+    selectedSize: item.selectedSize || null,
+    selectedAddons: normalizeAddons(item.selectedAddons || []),
   };
 };
 

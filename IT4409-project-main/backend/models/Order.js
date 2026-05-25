@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 export const EOrderStatus = {
   WaitingForPayment: "waiting_for_payment",
   Pending: "pending",
+  Preparing: "preparing",
+  Ready: "ready",
   Confirmed: "confirmed",
   Shipping: "shipping",
   Cancelled: "cancelled",
@@ -14,6 +16,14 @@ export const EPaymentMethod = {
   Cash: "cash",
   Zalopay: "zalopay",
   Vnpay: "vnpay",
+};
+
+export const EPaymentStatus = {
+  Unpaid: "unpaid",
+  Waiting: "waiting",
+  Paid: "paid",
+  Failed: "failed",
+  Refunded: "refunded",
 };
 
 export const EFulfillmentType = {
@@ -87,6 +97,11 @@ const OrderSchema = new mongoose.Schema(
       enum: Object.values(EPaymentMethod),
       required: true,
     },
+    paymentStatus: {
+      type: String,
+      enum: Object.values(EPaymentStatus),
+      default: EPaymentStatus.Unpaid,
+    },
     fulfillmentType: {
       type: String,
       enum: Object.values(EFulfillmentType),
@@ -106,6 +121,9 @@ const OrderSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     voucherCode: { type: String },
     voucherId: { type: mongoose.Schema.Types.ObjectId, ref: "Voucher" },
+    voucherUsageCounted: { type: Boolean, default: false },
+    stockReserved: { type: Boolean, default: false },
+    stockReleased: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

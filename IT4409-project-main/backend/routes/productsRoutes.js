@@ -8,6 +8,12 @@ const router = express.Router();
 router.get("/products", productController.getProducts);
 router.get("/products/featured", productController.getFeaturedProducts);
 router.get("/products/bestsellers", productController.getBestSellerProducts);
+router.get(
+  "/admin/products",
+  authenticateToken,
+  authorizeRole("admin"),
+  productController.getAdminProducts
+);
 router.get("/products/:id", productController.getProductById);
 
 router.post(

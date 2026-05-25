@@ -131,7 +131,7 @@ export default function CheckoutPage() {
         {
           code,
           items: selectedItems.map(buildVoucherItemPayload),
-          orderTotal: totals.subtotal,
+          orderTotal: totals.subtotal + totals.deliveryFee,
           deliveryFee: totals.deliveryFee,
           fulfillmentType: formData.fulfillmentType,
         },

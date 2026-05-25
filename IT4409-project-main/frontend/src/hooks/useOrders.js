@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import mockOrders from '../api/mockOrders';
 
 export function useOrders() {
   const [orders, setOrders] = useState(() => {
     const saved = localStorage.getItem('orders');
-    return saved ? JSON.parse(saved) : mockOrders;
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {

@@ -5,6 +5,52 @@ import { FiUser, FiLock, FiArrowRight } from "react-icons/fi";
 import SEO from "../components/common/SEO";
 import { buildApiUrl } from "../config/api";
 
+const getRecaptchaSiteKey = () => import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
+
+const loadRecaptchaScript = (siteKey) =>
+  new Promise((resolve, reject) => {
+    if (!siteKey) {
+      resolve(null);
+      return;
+    }
+
+    if (window.grecaptcha?.execute) {
+      resolve(window.grecaptcha);
+      return;
+    }
+
+    const existingScript = document.querySelector("script[data-recaptcha='true']");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(window.grecaptcha));
+      existingScript.addEventListener("error", reject);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.recaptcha = "true";
+    script.onload = () => resolve(window.grecaptcha);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+const getCaptchaToken = async () => {
+  const siteKey = getRecaptchaSiteKey();
+  if (!siteKey) return "";
+
+  const grecaptcha = await loadRecaptchaScript(siteKey);
+  if (!grecaptcha?.execute) return "";
+
+  return new Promise((resolve) => {
+    grecaptcha.ready(async () => {
+      const token = await grecaptcha.execute(siteKey, { action: "login" });
+      resolve(token);
+    });
+  });
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -17,9 +63,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      const captchaToken = await getCaptchaToken();
       const res = await axios.post(buildApiUrl("/login"), {
         username,
         password,
+        ...(captchaToken ? { captchaToken } : {}),
       });
       const user = res.data.user;
       const token = res.data.token;

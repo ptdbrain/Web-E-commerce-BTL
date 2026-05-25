@@ -6,7 +6,6 @@ const CheckboxFilter = ({
   selectedValues,
   onChange,
   showAll = false,
-  emoji = "",
 }) => {
   const [expanded, setExpanded] = React.useState(false);
   const displayOptions = showAll || expanded ? options : options.slice(0, 5);

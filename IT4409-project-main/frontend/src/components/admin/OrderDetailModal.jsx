@@ -16,6 +16,8 @@ import {
   getFulfillmentColor,
   getFulfillmentLabel,
   getPaymentLabel,
+  getPaymentStatusColor,
+  getPaymentStatusLabel,
   getStatusColor,
   getStatusLabel,
 } from "./utils";
@@ -89,6 +91,11 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
                   {getPaymentLabel(order.paymentMethod)}
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}
+                >
+                  {getPaymentStatusLabel(order.paymentStatus)}
                 </span>
               </div>
             </div>
@@ -287,6 +294,12 @@ export const OrderDetailModal = ({ order, onClose }) => {
                   <span>Giam gia</span>
                   <span className="font-semibold text-emerald-600">
                     -{formatPriceAdmin(discountAmount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Trang thai thanh toan</span>
+                  <span className="font-semibold text-slate-900">
+                    {getPaymentStatusLabel(order.paymentStatus)}
                   </span>
                 </div>
                 {order.voucherCode ? (

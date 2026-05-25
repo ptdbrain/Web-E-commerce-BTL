@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { clearProductsCache } from "../../api/productsApi";
 import { buildApiUrl } from "../../config/api";
-import { categories } from "../../data/categories";
+import { categories as fallbackCategories } from "../../data/categories";
 import {
   buildAdminProductPayload,
   createAdminAddon,
@@ -69,6 +69,7 @@ const getProductSearchTarget = (product) =>
 
 export const AdminProducts = () => {
   const [products, setProducts] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState(fallbackCategories);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -87,8 +88,14 @@ export const AdminProducts = () => {
     setError("");
 
     try {
-      const response = await axios.get(buildApiUrl("/products"));
-      setProducts(Array.isArray(response.data) ? response.data : []);
+      const token = localStorage.getItem("token");
+      const response = await axios.get(buildApiUrl("/admin/products?limit=200"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rawProducts = Array.isArray(response.data)
+        ? response.data
+        : response.data?.data || [];
+      setProducts(Array.isArray(rawProducts) ? rawProducts : []);
     } catch (err) {
       console.error("Failed to load products", err);
       setProducts([]);
@@ -98,8 +105,27 @@ export const AdminProducts = () => {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(buildApiUrl("/admin/categories"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rawCategories = Array.isArray(response.data)
+        ? response.data
+        : response.data?.categories || [];
+      if (rawCategories.length > 0) {
+        setCategoryOptions(rawCategories);
+      }
+    } catch (err) {
+      console.error("Failed to load categories for admin products", err);
+      setCategoryOptions(fallbackCategories);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -117,8 +143,8 @@ export const AdminProducts = () => {
       const matchesAvailability =
         filters.availability === "all" ||
         (filters.availability === "available"
-          ? product.isAvailable !== false
-          : product.isAvailable === false);
+          ? product.isAvailable !== false && product.isActive !== false
+          : product.isAvailable === false || product.isActive === false);
 
       return matchesQuery && matchesCategory && matchesAvailability;
     });
@@ -127,7 +153,9 @@ export const AdminProducts = () => {
   const stats = useMemo(
     () => ({
       total: products.length,
-      available: products.filter((product) => product.isAvailable !== false).length,
+      available: products.filter(
+        (product) => product.isAvailable !== false && product.isActive !== false
+      ).length,
       bestseller: products.filter((product) => product.isBestSeller).length,
       combos: products.filter((product) => product.itemType === "combo").length,
     }),
@@ -254,7 +282,7 @@ export const AdminProducts = () => {
       return;
     }
 
-    if (!window.confirm("Xoa mon nay khoi menu?")) return;
+    if (!window.confirm("An mon nay khoi storefront?")) return;
 
     setDeletingId(productId);
     setError("");
@@ -376,7 +404,7 @@ export const AdminProducts = () => {
               className={inputClass}
             >
               <option value="all">Tat ca danh muc</option>
-              {categories.map((category) => (
+              {categoryOptions.map((category) => (
                 <option key={category.slug} value={category.slug}>
                   {category.name}
                 </option>
@@ -475,12 +503,14 @@ export const AdminProducts = () => {
                     </div>
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        product.isAvailable !== false
+                        product.isAvailable !== false && product.isActive !== false
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-900/70 text-white"
                       }`}
                     >
-                      {product.isAvailable !== false ? "Dang ban" : "Tam an"}
+                      {product.isAvailable !== false && product.isActive !== false
+                        ? "Dang ban"
+                        : "Tam an"}
                     </span>
                   </div>
                 </div>
@@ -571,7 +601,7 @@ export const AdminProducts = () => {
                       ) : (
                         <Trash2 size={16} />
                       )}
-                      Xoa mon
+                      An mon
                     </button>
                   </div>
                 </div>
@@ -642,7 +672,7 @@ export const AdminProducts = () => {
                             onChange={(event) => updateField("category", event.target.value)}
                             className={inputClass}
                           >
-                            {categories.map((category) => (
+                            {categoryOptions.map((category) => (
                               <option key={category.slug} value={category.slug}>
                                 {category.name}
                               </option>
@@ -1062,7 +1092,7 @@ export const AdminProducts = () => {
                     <div className="mt-2 text-sm text-slate-300">
                       {ITEM_TYPE_OPTIONS.find((item) => item.value === formState.itemType)?.label ||
                         "Mon le"}{" "}
-                      • {categories.find((category) => category.slug === formState.category)?.name || formState.category}
+                      - {categoryOptions.find((category) => category.slug === formState.category)?.name || formState.category}
                     </div>
                     <div className="mt-6 rounded-2xl bg-white/10 p-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-300">
