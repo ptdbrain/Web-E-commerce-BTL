@@ -7,7 +7,7 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error) {
     // Cập nhật state để hiển thị UI fallback
     return { hasError: true };
   }
@@ -41,7 +41,7 @@ class ErrorBoundary extends React.Component {
             </p>
 
             {/* Chỉ hiển thị chi tiết lỗi ở development mode */}
-            {process.env.NODE_ENV === "development" && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="error-details">
                 <summary>Chi tiết lỗi (Development Only)</summary>
                 <pre className="error-stack">

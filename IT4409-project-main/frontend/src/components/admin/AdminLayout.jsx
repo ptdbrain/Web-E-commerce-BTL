@@ -3,6 +3,7 @@ import {
   BarChart3,
   ChevronRight,
   LayoutDashboard,
+  FolderTree,
   MessagesSquare,
   Package2,
   ShoppingBag,
@@ -28,6 +29,12 @@ const navItems = [
     label: "Menu",
     description: "Mon le, combo va do uong",
     icon: Package2,
+  },
+  {
+    to: "/admin/categories",
+    label: "Danh muc",
+    description: "Nhom mon va icon menu",
+    icon: FolderTree,
   },
   {
     to: "/admin/vouchers",

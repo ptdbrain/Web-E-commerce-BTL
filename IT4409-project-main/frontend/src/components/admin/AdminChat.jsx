@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   adminEndSupport,
   adminJoinSupport,
@@ -20,7 +20,20 @@ export default function AdminChat() {
   const [supportChanging, setSupportChanging] = useState(false);
   const pollIntervalRef = useRef(null);
 
-  const loadConversations = async (options = {}) => {
+  const loadMessages = useCallback(async (userId) => {
+    if (!userId) return;
+    setLoadingMessages(true);
+    try {
+      const data = await fetchChatHistoryForAdmin(userId);
+      setMessages(data);
+    } catch (err) {
+      console.error("Failed to load messages for admin", err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, []);
+
+  const loadConversations = useCallback(async (options = {}) => {
     setLoadingConversations(true);
     try {
       const data = await fetchConversationsForAdmin();
@@ -32,31 +45,21 @@ export default function AdminChat() {
           setSelectedUserInfo(matched);
         }
       } else if (!selectedUserId && data.length > 0) {
-        handleSelectUser(data[0]);
+        const firstConversation = data[0];
+        setSelectedUserId(firstConversation.userId);
+        setSelectedUserInfo(firstConversation);
+        loadMessages(firstConversation.userId);
       }
     } catch (err) {
       console.error("Failed to load conversations", err);
     } finally {
       setLoadingConversations(false);
     }
-  };
-
-  const loadMessages = async (userId) => {
-    if (!userId) return;
-    setLoadingMessages(true);
-    try {
-      const data = await fetchChatHistoryForAdmin(userId);
-      setMessages(data);
-    } catch (err) {
-      console.error("Failed to load messages for admin", err);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
+  }, [loadMessages, selectedUserId]);
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     if (!selectedUserId) {
@@ -84,13 +87,13 @@ export default function AdminChat() {
         pollIntervalRef.current = null;
       }
     };
-  }, [selectedUserId]);
+  }, [loadConversations, loadMessages, selectedUserId]);
 
-  const handleSelectUser = (conversation) => {
+  const handleSelectUser = useCallback((conversation) => {
     setSelectedUserId(conversation.userId);
     setSelectedUserInfo(conversation);
     loadMessages(conversation.userId);
-  };
+  }, [loadMessages]);
 
   const handleJoinSupport = async () => {
     if (!selectedUserId || supportChanging) return;
@@ -203,11 +206,18 @@ export default function AdminChat() {
                     : "bg-white"
                 }`}
               >
-                <div className="font-semibold text-slate-900">
-                  {conversation.fullname ||
-                    conversation.username ||
-                    conversation.email ||
-                    conversation.userId}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 truncate font-semibold text-slate-900">
+                    {conversation.fullname ||
+                      conversation.username ||
+                      conversation.email ||
+                      conversation.userId}
+                  </div>
+                  {conversation.unreadCount > 0 ? (
+                    <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      {conversation.unreadCount}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-1 truncate text-xs text-slate-500">
                   {conversation.lastRole === "user" ? "KH: " : "Admin: "}

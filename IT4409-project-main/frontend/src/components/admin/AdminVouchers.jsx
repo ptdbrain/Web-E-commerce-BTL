@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   LoaderCircle,
+  PencilLine,
   RefreshCw,
   Search,
   TicketPercent,
@@ -52,6 +53,43 @@ const formatDate = (value) => {
   return date.toLocaleDateString("vi-VN");
 };
 
+const formatDateInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const toIdList = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => String(item?._id || item?.id || item || ""))
+    .filter(Boolean);
+
+const voucherToForm = (voucher = {}) => {
+  const userIds = toIdList(voucher.users);
+  const productIds = toIdList(voucher.products);
+  const categoryIds = toIdList(voucher.categories);
+
+  return {
+    code: voucher.code || "",
+    description: voucher.description || "",
+    discountType: voucher.discountType || "percent",
+    discountValue: Number(voucher.discountValue || 0),
+    maxDiscountAmount: Number(voucher.maxDiscountAmount || 0),
+    minOrderValue: Number(voucher.minOrderValue || 0),
+    maxUsage: Number(voucher.maxUsage || 0),
+    startDate: formatDateInput(voucher.startDate),
+    endDate: formatDateInput(voucher.endDate),
+    appliesToAllUsers: voucher.appliesToAllUsers || userIds.length === 0,
+    appliesToAllProducts:
+      voucher.appliesToAllProducts ||
+      (productIds.length === 0 && categoryIds.length === 0),
+    userIds,
+    productIds,
+    categoryIds,
+  };
+};
+
 const getTargetSummary = (form) => {
   if (form.appliesToAllProducts) return "Toan bo menu";
   return `${form.productIds.length} mon | ${form.categoryIds.length} danh muc`;
@@ -65,6 +103,7 @@ export default function AdminVouchers() {
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(createInitialForm());
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState("");
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -79,7 +118,7 @@ export default function AdminVouchers() {
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [actingVoucherId, setActingVoucherId] = useState("");
 
-  const getAuthConfig = () => {
+  const getAuthConfig = useCallback(() => {
     const token = localStorage.getItem("token");
     return token
       ? {
@@ -88,9 +127,9 @@ export default function AdminVouchers() {
           },
         }
       : { headers: {} };
-  };
+  }, []);
 
-  const loadVouchers = async () => {
+  const loadVouchers = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -104,11 +143,11 @@ export default function AdminVouchers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
   useEffect(() => {
     loadVouchers();
-  }, []);
+  }, [loadVouchers]);
 
   const filteredVouchers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -180,6 +219,7 @@ export default function AdminVouchers() {
 
   const resetCreateForm = () => {
     setForm(createInitialForm());
+    setEditingVoucherId("");
     setUserResults([]);
     setProductResults([]);
     setCategoryResults([]);
@@ -188,36 +228,63 @@ export default function AdminVouchers() {
     setCategorySearch("");
   };
 
-  const handleCreateVoucher = async (event) => {
+  const openCreateForm = () => {
+    resetCreateForm();
+    setError("");
+    setShowCreateForm(true);
+  };
+
+  const openEditForm = (voucher) => {
+    setEditingVoucherId(voucher._id);
+    setForm(voucherToForm(voucher));
+    setError("");
+    setShowCreateForm(true);
+  };
+
+  const closeForm = () => {
+    setShowCreateForm(false);
+    resetCreateForm();
+  };
+
+  const handleSaveVoucher = async (event) => {
     event.preventDefault();
     setError("");
 
     try {
       setSaving(true);
-      const response = await axios.post(
-        buildApiUrl("/vouchers"),
-        {
-          ...form,
-          code: form.code.trim().toUpperCase(),
-          discountValue:
-            form.discountType === "free_shipping" ? 0 : Number(form.discountValue || 0),
-          maxDiscountAmount:
-            form.discountType === "percent"
-              ? Number(form.maxDiscountAmount || 0)
-              : 0,
-          userIds: form.appliesToAllUsers ? [] : form.userIds,
-          productIds: form.appliesToAllProducts ? [] : form.productIds,
-          categoryIds: form.appliesToAllProducts ? [] : form.categoryIds,
-        },
-        getAuthConfig()
-      );
+      const payload = {
+        ...form,
+        code: form.code.trim().toUpperCase(),
+        discountValue:
+          form.discountType === "free_shipping" ? 0 : Number(form.discountValue || 0),
+        maxDiscountAmount:
+          form.discountType === "percent"
+            ? Number(form.maxDiscountAmount || 0)
+            : 0,
+        userIds: form.appliesToAllUsers ? [] : form.userIds,
+        productIds: form.appliesToAllProducts ? [] : form.productIds,
+        categoryIds: form.appliesToAllProducts ? [] : form.categoryIds,
+      };
 
-      setVouchers((prev) => [response.data.voucher, ...prev]);
-      setShowCreateForm(false);
-      resetCreateForm();
+      const response = editingVoucherId
+        ? await axios.put(
+            buildApiUrl(`/vouchers/${editingVoucherId}`),
+            payload,
+            getAuthConfig()
+          )
+        : await axios.post(buildApiUrl("/vouchers"), payload, getAuthConfig());
+
+      setVouchers((prev) =>
+        editingVoucherId
+          ? prev.map((voucher) =>
+              voucher._id === editingVoucherId ? response.data.voucher : voucher
+            )
+          : [response.data.voucher, ...prev]
+      );
+      closeForm();
     } catch (err) {
-      console.error("Failed to create voucher", err);
-      setError(err?.response?.data?.message || "Khong the tao voucher.");
+      console.error("Failed to save voucher", err);
+      setError(err?.response?.data?.message || "Khong the luu voucher.");
     } finally {
       setSaving(false);
     }
@@ -261,7 +328,7 @@ export default function AdminVouchers() {
     }
   };
 
-  const fetchUsers = async (searchValue) => {
+  const fetchUsers = useCallback(async (searchValue) => {
     setUserLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-users"), {
@@ -274,9 +341,9 @@ export default function AdminVouchers() {
     } finally {
       setUserLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
-  const fetchProducts = async (searchValue) => {
+  const fetchProducts = useCallback(async (searchValue) => {
     setProductLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-products"), {
@@ -291,9 +358,9 @@ export default function AdminVouchers() {
     } finally {
       setProductLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
-  const fetchCategories = async (searchValue) => {
+  const fetchCategories = useCallback(async (searchValue) => {
     setCategoryLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-categories"), {
@@ -308,25 +375,25 @@ export default function AdminVouchers() {
     } finally {
       setCategoryLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
   useEffect(() => {
     if (!userModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchUsers(userSearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [userModalOpen, userSearch]);
+  }, [fetchUsers, userModalOpen, userSearch]);
 
   useEffect(() => {
     if (!productModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchProducts(productSearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [productModalOpen, productSearch]);
+  }, [fetchProducts, productModalOpen, productSearch]);
 
   useEffect(() => {
     if (!categoryModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchCategories(categorySearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [categoryModalOpen, categorySearch]);
+  }, [categoryModalOpen, categorySearch, fetchCategories]);
 
   const openUserModal = () => {
     setUserModalOpen(true);
@@ -395,7 +462,7 @@ export default function AdminVouchers() {
 
           <button
             type="button"
-            onClick={() => setShowCreateForm(true)}
+            onClick={openCreateForm}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <TicketPercent size={16} />
@@ -554,6 +621,15 @@ export default function AdminVouchers() {
               <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => openEditForm(voucher)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <PencilLine size={16} />
+                  Chinh sua
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleToggleVoucherStatus(voucher)}
                   disabled={actingVoucherId === voucher._id}
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
@@ -589,10 +665,10 @@ export default function AdminVouchers() {
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
-                  Tao voucher moi
+                  {editingVoucherId ? "Cap nhat voucher" : "Tao voucher moi"}
                 </div>
                 <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
-                  FireBite promotion builder
+                  {editingVoucherId ? "Chinh sua promotion" : "FireBite promotion builder"}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Chon muc giam, thoi gian va pham vi ap dung cho voucher.
@@ -601,10 +677,7 @@ export default function AdminVouchers() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  resetCreateForm();
-                }}
+                onClick={closeForm}
                 className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
               >
                 Dong
@@ -612,7 +685,7 @@ export default function AdminVouchers() {
             </div>
 
             <form
-              onSubmit={handleCreateVoucher}
+              onSubmit={handleSaveVoucher}
               className="max-h-[calc(94vh-92px)] overflow-y-auto p-6"
             >
               <div className="space-y-6">
@@ -840,10 +913,7 @@ export default function AdminVouchers() {
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-6">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      resetCreateForm();
-                    }}
+                    onClick={closeForm}
                     className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     Huy
@@ -856,7 +926,7 @@ export default function AdminVouchers() {
                     {saving ? (
                       <LoaderCircle size={16} className="animate-spin" />
                     ) : null}
-                    Tao voucher
+                    {editingVoucherId ? "Cap nhat voucher" : "Tao voucher"}
                   </button>
                 </div>
               </div>

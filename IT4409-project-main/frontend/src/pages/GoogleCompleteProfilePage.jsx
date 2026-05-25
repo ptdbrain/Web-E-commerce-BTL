@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import SEO from "../components/common/SEO";
@@ -7,7 +7,7 @@ import { buildApiUrl } from "../config/api";
 export default function GoogleCompleteProfilePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state || {};
+  const state = useMemo(() => location.state || {}, [location.state]);
 
   const [form, setForm] = useState({
     username: "",
@@ -17,10 +17,8 @@ export default function GoogleCompleteProfilePage() {
     phoneNumber: "",
     address: "",
   });
-  const [email, setEmail] = useState(state.email || "");
-  const [googleSignupToken, setGoogleSignupToken] = useState(
-    state.googleSignupToken || ""
-  );
+  const [email] = useState(state.email || "");
+  const [googleSignupToken] = useState(state.googleSignupToken || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

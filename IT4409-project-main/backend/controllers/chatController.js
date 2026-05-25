@@ -67,6 +67,20 @@ export const getConversationsForAdmin = async (req, res) => {
 
     const userIds = lastMessages.map((c) => c._id);
 
+    const unreadCounts = await ChatMessage.aggregate([
+      {
+        $match: {
+          user: { $in: userIds },
+          role: "user",
+          isReadByAdmin: { $ne: true },
+        },
+      },
+      { $group: { _id: "$user", count: { $sum: 1 } } },
+    ]);
+    const unreadByUserId = new Map(
+      unreadCounts.map((item) => [item._id.toString(), item.count])
+    );
+
     // Lấy thông tin user
     const users = await User.find({ _id: { $in: userIds } })
       .select("username fullname email")
@@ -118,6 +132,7 @@ export const getConversationsForAdmin = async (req, res) => {
           lastAdminId: lastAdmin?._id || null,
           lastAdminName,
           isHandledByMe,
+          unreadCount: unreadByUserId.get(userId) || 0,
         };
       })
       .sort((a, b) => {

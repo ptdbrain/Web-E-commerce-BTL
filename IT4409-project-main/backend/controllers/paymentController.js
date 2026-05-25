@@ -1,6 +1,58 @@
 import CryptoJS from "crypto-js";
-import Order, { EOrderStatus } from "../models/Order.js";
-import { zaloPayConfig, queryZaloPayStatus } from "../config/zalopay.js";
+
+import Order, { EOrderStatus, EPaymentStatus } from "../models/Order.js";
+import Product from "../models/Product.js";
+import Voucher from "../models/Voucher.js";
+import { queryZaloPayStatus, zaloPayConfig } from "../config/zalopay.js";
+
+const markOrderPaid = async (order) => {
+  if (!order) return null;
+  if ([EOrderStatus.Cancelled, EOrderStatus.Refunded].includes(order.orderStatus)) {
+    return order;
+  }
+
+  if (order.orderStatus === EOrderStatus.WaitingForPayment) {
+    order.orderStatus = EOrderStatus.Pending;
+  }
+
+  order.paymentStatus = EPaymentStatus.Paid;
+
+  if (order.voucherId && !order.voucherUsageCounted) {
+    await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usedCount: 1 } });
+    order.voucherUsageCounted = true;
+  }
+
+  await order.save();
+  return order;
+};
+
+const releaseInventoryForOrder = async (order) => {
+  if (!order || !order.stockReserved || order.stockReleased) return;
+
+  const writes = (Array.isArray(order.items) ? order.items : [])
+    .map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter((item) => item.productId && item.quantity > 0)
+    .map((item) => ({
+      updateOne: {
+        filter: { _id: item.productId },
+        update: {
+          $inc: {
+            stock: item.quantity,
+            soldCount: -item.quantity,
+          },
+        },
+      },
+    }));
+
+  if (writes.length > 0) {
+    await Product.bulkWrite(writes);
+  }
+
+  order.stockReleased = true;
+};
 
 export const zaloPayCallback = async (req, res) => {
   const result = {};
@@ -16,41 +68,32 @@ export const zaloPayCallback = async (req, res) => {
     }
 
     const mac = CryptoJS.HmacSHA256(dataStr, zaloPayConfig.key2).toString();
-    console.log("[ZaloPay] computed mac =", mac);
 
     if (reqMac !== mac) {
       result.return_code = -1;
       result.return_message = "mac not equal";
-    } else {
-      const dataJson = JSON.parse(dataStr);
-      const appTransId = dataJson["app_trans_id"];
-
-      if (appTransId) {
-        await Order.findOneAndUpdate(
-          { zaloPayAppTransId: appTransId },
-          { $set: { orderStatus: EOrderStatus.Confirmed } }
-        );
-        console.log(
-          "[ZaloPay] Updated order status to confirmed for app_trans_id =",
-          appTransId
-        );
-      } else {
-        console.warn("[ZaloPay] app_trans_id missing in callback data");
-      }
-
-      result.return_code = 1;
-      result.return_message = "success";
+      return res.json(result);
     }
+
+    const dataJson = JSON.parse(dataStr);
+    const appTransId = dataJson.app_trans_id;
+
+    if (appTransId) {
+      const order = await Order.findOne({ zaloPayAppTransId: appTransId });
+      await markOrderPaid(order);
+    }
+
+    result.return_code = 1;
+    result.return_message = "success";
   } catch (ex) {
     console.error("[ZaloPay] callback error:", ex);
-    result.return_code = 0; // ZaloPay sẽ callback lại (tối đa 3 lần)
+    result.return_code = 0;
     result.return_message = ex.message;
   }
 
   return res.json(result);
 };
 
-// API để check status thanh toán ZaloPay và auto update order
 export const checkZaloPayStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -65,10 +108,10 @@ export const checkZaloPayStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Nếu đơn hàng không phải đang chờ thanh toán, trả về trạng thái hiện tại
     if (order.orderStatus !== EOrderStatus.WaitingForPayment) {
       return res.json({
         orderStatus: order.orderStatus,
+        paymentStatus: order.paymentStatus,
         message: "Order is not waiting for payment",
       });
     }
@@ -77,90 +120,47 @@ export const checkZaloPayStatus = async (req, res) => {
       return res.status(400).json({ message: "No ZaloPay transaction found" });
     }
 
-    // Query trạng thái từ ZaloPay
     const zaloPayResult = await queryZaloPayStatus(order.zaloPayAppTransId);
-    console.log("[ZaloPay] Query status result:", zaloPayResult);
 
-    // return_code: 1 = thanh toán thành công, 2 = đang xử lý, 3 = thất bại
     if (zaloPayResult.return_code === 1) {
-      // Cập nhật trạng thái đơn hàng sang Confirmed (đã thanh toán)
-      order.orderStatus = EOrderStatus.Confirmed;
-      await order.save();
+      await markOrderPaid(order);
 
       return res.json({
         orderStatus: order.orderStatus,
+        paymentStatus: order.paymentStatus,
         zaloPayStatus: zaloPayResult,
         message: "Payment confirmed",
       });
-    } else if (zaloPayResult.return_code === 2) {
+    }
+
+    if (zaloPayResult.return_code === 2) {
       return res.json({
         orderStatus: order.orderStatus,
+        paymentStatus: order.paymentStatus,
         zaloPayStatus: zaloPayResult,
         message: "Payment is processing",
       });
-    } else {
-      return res.json({
-        orderStatus: order.orderStatus,
-        zaloPayStatus: zaloPayResult,
-        message: "Payment failed or not completed",
-      });
     }
+
+    await releaseInventoryForOrder(order);
+    order.paymentStatus = EPaymentStatus.Failed;
+    await order.save();
+
+    return res.json({
+      orderStatus: order.orderStatus,
+      paymentStatus: order.paymentStatus,
+      zaloPayStatus: zaloPayResult,
+      message: "Payment failed or not completed",
+    });
   } catch (err) {
     console.error("[ZaloPay] checkZaloPayStatus error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
-// API để force update order status sang paid (dùng cho testing/demo sau 30s)
-export const confirmZaloPayOrder = async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const customerId = req.user?.id;
-
-    console.log(
-      `[ZaloPay] confirmZaloPayOrder called - orderId: ${orderId}, customerId: ${customerId}`
-    );
-
-    if (!customerId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    // Tìm order - không check customerId để đảm bảo tìm được
-    let order = await Order.findById(orderId);
-
-    if (!order) {
-      console.log(`[ZaloPay] Order ${orderId} not found`);
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    console.log(
-      `[ZaloPay] Found order - status: ${order.orderStatus}, owner: ${order.customerId}`
-    );
-
-    // Chỉ cho phép confirm nếu đang ở trạng thái chờ thanh toán
-    if (order.orderStatus !== EOrderStatus.WaitingForPayment) {
-      return res.json({
-        orderStatus: order.orderStatus,
-        message: "Order is not waiting for payment",
-      });
-    }
-
-    // Cập nhật trạng thái sang Confirmed
-    order.orderStatus = EOrderStatus.Confirmed;
-    await order.save();
-
-    console.log(
-      `[ZaloPay] Order ${orderId} confirmed successfully - new status: ${order.orderStatus}`
-    );
-
-    return res.json({
-      orderStatus: order.orderStatus,
-      message: "Order confirmed successfully",
-    });
-  } catch (err) {
-    console.error("[ZaloPay] confirmZaloPayOrder error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+export const confirmZaloPayOrder = async (req, res) =>
+  res.status(410).json({
+    message: "Manual ZaloPay confirmation is disabled. Use callback or status check.",
+  });
 
 export default { zaloPayCallback, checkZaloPayStatus, confirmZaloPayOrder };

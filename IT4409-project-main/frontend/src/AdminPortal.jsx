@@ -5,6 +5,7 @@ import AdminLayout from './components/admin/AdminLayout.jsx';
 import Dashboard from './pages/admin/DashBoard.jsx';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage.jsx';
 import AdminProductsPage from './pages/admin/AdminProductsPage.jsx';
+import AdminCategoriesPage from './pages/admin/AdminCategoriesPage.jsx';
 import AdminChatPage from './pages/admin/AdminChatPage.jsx';
 import AdminVouchersPage from './pages/admin/AdminVouchersPage.jsx';
 
@@ -15,9 +16,11 @@ export default function AdminPortal() {
     try {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
-      try { delete axios.defaults.headers.common['Authorization']; } catch (e) {}
+      delete axios.defaults.headers.common['Authorization'];
       window.dispatchEvent(new Event('authChanged'));
-    } catch (e) {}
+    } catch {
+      window.dispatchEvent(new Event('authChanged'));
+    }
     navigate('/login', { replace: true });
   };
 
@@ -28,6 +31,7 @@ export default function AdminPortal() {
         <Route index element={<Dashboard />} />
         <Route path="orders" element={<AdminOrdersPage />} />
         <Route path="products" element={<AdminProductsPage />} />
+        <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="vouchers" element={<AdminVouchersPage />} />
         <Route path="chat" element={<AdminChatPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />

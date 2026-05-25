@@ -13,7 +13,6 @@ export function CartPopup() {
     addToCart,
     decreaseQuantity,
     removeFromCart,
-    selectedItemIds,
     setSelectedItemIds,
     setIsManualSelection,
     setDirectCheckoutItems,

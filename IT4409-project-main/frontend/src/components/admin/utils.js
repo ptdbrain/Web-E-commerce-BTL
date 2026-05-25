@@ -12,9 +12,13 @@ const statusMeta = {
     label: "Cho xu ly",
     className: "border border-amber-200 bg-amber-50 text-amber-700",
   },
-  paid: {
-    label: "Da thanh toan",
+  preparing: {
+    label: "Dang che bien",
     className: "border border-sky-200 bg-sky-50 text-sky-700",
+  },
+  ready: {
+    label: "San sang giao",
+    className: "border border-lime-200 bg-lime-50 text-lime-700",
   },
   shipping: {
     label: "Dang phuc vu",
@@ -54,6 +58,29 @@ const paymentMeta = {
   zalopay: "ZaloPay",
   card: "The ngan hang",
   vnpay: "VNPay",
+};
+
+const paymentStatusMeta = {
+  unpaid: {
+    label: "Chua thu tien",
+    className: "border border-slate-200 bg-slate-50 text-slate-600",
+  },
+  waiting: {
+    label: "Cho thanh toan",
+    className: "border border-orange-200 bg-orange-50 text-orange-700",
+  },
+  paid: {
+    label: "Da thanh toan",
+    className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  failed: {
+    label: "Thanh toan loi",
+    className: "border border-rose-200 bg-rose-50 text-rose-700",
+  },
+  refunded: {
+    label: "Da hoan tien",
+    className: "border border-slate-200 bg-slate-100 text-slate-700",
+  },
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -298,3 +325,10 @@ export const getFulfillmentLabel = (type) =>
 
 export const getPaymentLabel = (method) =>
   paymentMeta[method] || String(method || "--");
+
+export const getPaymentStatusColor = (status) =>
+  paymentStatusMeta[status]?.className ||
+  "border border-slate-200 bg-slate-100 text-slate-700";
+
+export const getPaymentStatusLabel = (status) =>
+  paymentStatusMeta[status]?.label || String(status || "--");

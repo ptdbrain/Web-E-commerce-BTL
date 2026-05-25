@@ -52,3 +52,15 @@ export const buildProductFilter = (query = {}) => {
     limit,
   };
 };
+
+export const buildProductVisibilityFilter = ({
+  includeInactive = false,
+  isAvailable,
+} = {}) => {
+  if (includeInactive) return {};
+
+  return {
+    isActive: { $ne: false },
+    isAvailable: isAvailable === undefined ? { $ne: false } : isAvailable,
+  };
+};

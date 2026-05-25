@@ -1,6 +1,7 @@
 import User from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import {
   JWT_SECRET,
@@ -12,6 +13,13 @@ import { sendPasswordResetEmail } from "../config/email.js";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
+
+const generateVerificationCode = (length = 8) =>
+  crypto
+    .randomBytes(Math.ceil(length / 2))
+    .toString("hex")
+    .slice(0, length)
+    .toUpperCase();
 
 async function verifyGoogleIdToken(idToken) {
   if (!googleClient || !googleClientId) {

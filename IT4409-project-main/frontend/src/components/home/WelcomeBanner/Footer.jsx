@@ -41,16 +41,20 @@ const Footer = () => {
                 { Icon: FaYoutube, label: "YouTube" },
                 { Icon: FaInstagram, label: "Instagram" },
                 { Icon: SiZalo, label: "Zalo" },
-              ].map(({ Icon, label }) => (
-                <a
-                  key={label}
-                  href="#"
-                  aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800/80 text-slate-400 transition-all duration-200 hover:bg-gradient-to-br hover:from-orange-500 hover:to-rose-500 hover:text-white hover:shadow-glow hover:scale-110"
-                >
-                  <Icon size={15} />
-                </a>
-              ))}
+              ].map((item) => {
+                const SocialIcon = item.Icon;
+
+                return (
+                  <a
+                    key={item.label}
+                    href="#"
+                    aria-label={item.label}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800/80 text-slate-400 transition-all duration-200 hover:bg-gradient-to-br hover:from-orange-500 hover:to-rose-500 hover:text-white hover:shadow-glow hover:scale-110"
+                  >
+                    <SocialIcon size={15} />
+                  </a>
+                );
+              })}
             </div>
           </div>
 

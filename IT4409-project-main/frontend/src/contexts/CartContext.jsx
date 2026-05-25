@@ -1,5 +1,4 @@
 import React, {
-  createContext,
   useCallback,
   useEffect,
   useRef,
@@ -22,8 +21,7 @@ import {
   getItemBasePrice,
   mapServerCartItem,
 } from "../utils/cartPayload.js";
-
-export const CartContext = createContext();
+import { CartContext } from "./CartContextBase.js";
 
 const getStoredToken = () => localStorage.getItem("token") || "";
 
@@ -319,9 +317,8 @@ export function CartProvider({ children }) {
 
     const timeoutId = setTimeout(async () => {
       try {
-        await axios.post(
-          buildApiUrl(`/payment/zalopay/confirm/${pendingZaloPayOrder.id}`),
-          {},
+        const statusResponse = await axios.get(
+          buildApiUrl(`/payment/zalopay/status/${pendingZaloPayOrder.id}`),
           { headers: { Authorization: `Bearer ${authToken}` } }
         );
 
@@ -332,12 +329,33 @@ export function CartProvider({ children }) {
           ? ordersResponse.data.orders
           : [];
         setOrders(serverOrders.map(mapOrderForState));
+
+        if (statusResponse?.data?.paymentStatus !== "paid") {
+          const statusChecks = Number(pendingZaloPayOrder.statusChecks || 0) + 1;
+          if (statusChecks < 30) {
+            const nextPendingOrder = {
+              ...pendingZaloPayOrder,
+              statusChecks,
+              createdAt: Date.now() - 20000,
+            };
+            setPendingZaloPayOrder(nextPendingOrder);
+            localStorage.setItem(
+              "pendingZaloPayOrder",
+              JSON.stringify(nextPendingOrder)
+            );
+            return;
+          }
+          setPendingZaloPayOrder(null);
+          localStorage.removeItem("pendingZaloPayOrder");
+          return;
+        }
       } catch (error) {
-        console.error("[ZaloPay] Auto confirm error:", error);
-      } finally {
-        setPendingZaloPayOrder(null);
-        localStorage.removeItem("pendingZaloPayOrder");
+        console.error("[ZaloPay] Status check error:", error);
+        return;
       }
+
+      setPendingZaloPayOrder(null);
+      localStorage.removeItem("pendingZaloPayOrder");
     }, remainingTime);
 
     return () => clearTimeout(timeoutId);
@@ -506,6 +524,7 @@ export function CartProvider({ children }) {
           const pendingOrder = {
             id: createdOrder._id,
             createdAt: Date.now(),
+            statusChecks: 0,
           };
           setPendingZaloPayOrder(pendingOrder);
           localStorage.setItem(

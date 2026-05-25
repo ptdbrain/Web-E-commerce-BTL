@@ -200,8 +200,8 @@ const ProductListingPage = () => {
     <div className="product-listing-page">
       <SEO
         title={pageTitle}
-        description={`${pageTitle} tại FireBite — tìm sản phẩm công nghệ chính hãng, giao hàng nhanh.`}
-        keywords={`${pageTitle.toLowerCase()}, mua sắm, công nghệ, FireBite`}
+        description={`${pageTitle} tai FireBite - dat mon nhanh, nhan tai cua hang, dat ban hoac giao tan noi.`}
+        keywords={`${pageTitle.toLowerCase()}, do an nhanh, burger, ga ran, combo, FireBite`}
       />
 
       <Breadcrumb items={breadcrumbItems} />
