@@ -32,6 +32,7 @@ const clearProductsCache = async () => {
   }
 };
 
+// Chấp nhận cả ObjectId lẫn tên/slug category, trả về _id để dùng trong filter
 const resolveCategoryId = async (category) => {
   if (!category) return undefined;
   if (mongoose.Types.ObjectId.isValid(category)) return category;
