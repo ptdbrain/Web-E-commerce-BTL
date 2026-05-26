@@ -37,7 +37,7 @@ const getFulfillmentDetail = (order) => {
     return `${guestCount} khach • ${bookingTime}`;
   }
 
-  return order.shippingAddress || "Chua co dia chi giao hang";
+  return order.shippingAddress || "Chưa có địa chỉ giao hàng";
 };
 
 export const OrderDetailModal = ({ order, onClose }) => {
@@ -103,7 +103,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
             <div className="flex items-start gap-3">
               <div className="rounded-2xl bg-slate-950 px-4 py-3 text-right text-white">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                  Tong thanh toan
+                  Tổng thanh toán
                 </div>
                 <div className="mt-1 font-display text-2xl font-black">
                   {formatPriceAdmin(order.totalPrice)}
@@ -131,7 +131,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 <div className="mt-4 space-y-2 text-sm text-slate-600">
                   <div className="font-semibold text-slate-900">{order.customerName}</div>
                   <div>{order.customerPhone || "--"}</div>
-                  <div>{order.customerEmail || "Khong co email"}</div>
+                  <div>{order.customerEmail || "Không có email"}</div>
                 </div>
               </article>
 
@@ -243,7 +243,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Tao don
+                    Tạo đơn
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {formatDateTime(order.createdAt)}
@@ -297,7 +297,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Trang thai thanh toan</span>
+                  <span>Trạng thái thanh toán</span>
                   <span className="font-semibold text-slate-900">
                     {getPaymentStatusLabel(order.paymentStatus)}
                   </span>
@@ -309,7 +309,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 ) : null}
                 <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-300">Tong cong</span>
+                    <span className="text-sm text-slate-300">Tổng cộng</span>
                     <span className="font-display text-2xl font-black">
                       {formatPriceAdmin(order.totalPrice)}
                     </span>

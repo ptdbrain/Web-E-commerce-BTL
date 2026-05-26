@@ -77,7 +77,7 @@ export default function AdminCategories() {
       );
     } catch (err) {
       console.error("Failed to load categories", err);
-      setError(err?.response?.data?.message || "Khong the tai danh muc.");
+      setError(err?.response?.data?.message || "Không thể tải danh mục.");
       setCategories([]);
     } finally {
       setLoading(false);
@@ -154,7 +154,7 @@ export default function AdminCategories() {
       closeForm();
     } catch (err) {
       console.error("Failed to save category", err);
-      setError(err?.response?.data?.message || "Khong the luu danh muc.");
+      setError(err?.response?.data?.message || "Không thể lưu danh mục.");
     } finally {
       setSaving(false);
     }
@@ -179,7 +179,7 @@ export default function AdminCategories() {
       await loadCategories();
     } catch (err) {
       console.error("Failed to toggle category", err);
-      setError(err?.response?.data?.message || "Khong the cap nhat danh muc.");
+      setError(err?.response?.data?.message || "Không thể cập nhật danh mục.");
     } finally {
       setActingId("");
     }
@@ -207,15 +207,15 @@ export default function AdminCategories() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <Plus size={18} />
-            Them danh muc
+            Thêm danh mục
           </button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Tong danh muc", value: stats.total },
-            { label: "Dang hien thi", value: stats.active },
-            { label: "Dang an", value: stats.hidden },
+            { label: "Tổng danh mục", value: stats.total },
+            { label: "Đang hiển thị", value: stats.active },
+            { label: "Đang ẩn", value: stats.hidden },
             { label: "Co hinh/icon", value: stats.withImage },
           ].map((card) => (
             <div
@@ -251,7 +251,7 @@ export default function AdminCategories() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
             <RefreshCw size={16} />
-            Tai lai
+            Tải lại
           </button>
         </div>
 
@@ -277,10 +277,10 @@ export default function AdminCategories() {
             <FolderTree size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Khong tim thay danh muc
+            Không tìm thấy danh mục
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Thu doi tu khoa tim kiem hoac tao danh muc moi.
+            Thử đổi từ khóa tìm kiếm hoặc tạo danh mục mới.
           </p>
         </section>
       ) : (
@@ -313,7 +313,7 @@ export default function AdminCategories() {
                     <p className="mt-2 text-sm leading-6 text-slate-500">
                       {(category.subcategories || []).length > 0
                         ? category.subcategories.join(", ")
-                        : "Chua co danh muc con."}
+                        : "Chưa có danh mục con."}
                     </p>
                   </div>
                 </div>
@@ -325,7 +325,7 @@ export default function AdminCategories() {
                       : "border border-slate-200 bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {category.isActive !== false ? "Dang hien thi" : "Dang an"}
+                  {category.isActive !== false ? "Đang hiển thị" : "Đang ẩn"}
                 </span>
               </div>
 
@@ -336,7 +336,7 @@ export default function AdminCategories() {
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   <PencilLine size={16} />
-                  Chinh sua
+                  Chỉnh sửa
                 </button>
                 <button
                   type="button"
@@ -365,10 +365,10 @@ export default function AdminCategories() {
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
-                  {editingId ? "Cap nhat danh muc" : "Tao danh muc"}
+                  {editingId ? "Cập nhật danh mục" : "Tạo danh mục"}
                 </div>
                 <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
-                  {editingId ? "Chinh sua category" : "Them category vao menu"}
+                  {editingId ? "Chỉnh sửa category" : "Thêm category vào menu"}
                 </h3>
               </div>
               <button
@@ -436,7 +436,7 @@ export default function AdminCategories() {
               </div>
 
               <div>
-                <label className={labelClass}>Danh muc con</label>
+                <label className={labelClass}>Danh mục con</label>
                 <textarea
                   value={form.subcategoriesText}
                   onChange={(event) =>
@@ -473,7 +473,7 @@ export default function AdminCategories() {
                   onClick={closeForm}
                   className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  Huy
+                  Hủy
                 </button>
                 <button
                   type="submit"
@@ -481,7 +481,7 @@ export default function AdminCategories() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-rose-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/20 transition-transform hover:scale-[1.01] disabled:opacity-60"
                 >
                   {saving ? <LoaderCircle size={16} className="animate-spin" /> : null}
-                  {editingId ? "Cap nhat" : "Tao danh muc"}
+                  {editingId ? "Cập nhật" : "Tạo danh mục"}
                 </button>
               </div>
             </form>

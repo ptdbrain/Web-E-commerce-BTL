@@ -177,7 +177,7 @@ export default function AdminChat() {
                 onClick={loadConversations}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
               >
-                Lam moi
+                Làm mới
               </button>
             </div>
 
@@ -192,7 +192,7 @@ export default function AdminChat() {
 
           <div className="flex-1 overflow-y-auto bg-white">
             {loadingConversations && (
-              <div className="p-4 text-sm text-slate-400">Dang tai hoi thoai...</div>
+              <div className="p-4 text-sm text-slate-400">Đang tải hội thoại...</div>
             )}
 
             {filteredConversations.map((conversation) => (
@@ -226,7 +226,7 @@ export default function AdminChat() {
                 <div className="mt-2 space-y-1 text-[11px] text-slate-400">
                   {conversation.lastOrderCode ? (
                     <div className="font-semibold text-orange-600">
-                      Don #{conversation.lastOrderCode}
+                      Đơn #{conversation.lastOrderCode}
                     </div>
                   ) : null}
                   <div>
@@ -240,7 +240,7 @@ export default function AdminChat() {
                         conversation.isHandledByMe ? "text-emerald-600" : ""
                       }
                     >
-                      Dang duoc ho tro boi: {conversation.currentAdminName}
+                      Đang được hỗ trợ bởi: {conversation.currentAdminName}
                       {conversation.isHandledByMe && " (ban)"}
                     </div>
                   ) : conversation.lastAdminName ? (
@@ -251,7 +251,7 @@ export default function AdminChat() {
             ))}
 
             {!loadingConversations && conversations.length === 0 && (
-              <div className="p-4 text-sm text-slate-400">Chua co hoi thoai nao.</div>
+              <div className="p-4 text-sm text-slate-400">Chưa có hội thoại nào.</div>
             )}
           </div>
         </div>
@@ -272,12 +272,12 @@ export default function AdminChat() {
                   </div>
                   {selectedUserInfo.lastOrderCode ? (
                     <div className="mt-1 text-xs font-semibold text-orange-600">
-                      Dang co cau hoi ve don #{selectedUserInfo.lastOrderCode}
+                      Đang có câu hỏi về đơn #{selectedUserInfo.lastOrderCode}
                     </div>
                   ) : null}
                   {selectedUserInfo.currentAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
-                      Dang duoc ho tro boi: {selectedUserInfo.currentAdminName}
+                      Đang được hỗ trợ bởi: {selectedUserInfo.currentAdminName}
                       {selectedUserInfo.isHandledByMe && " (ban)"}
                     </div>
                   ) : selectedUserInfo.lastAdminName ? (
@@ -318,7 +318,7 @@ export default function AdminChat() {
 
           <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50/80 px-4 py-4 text-sm">
             {loadingMessages && (
-              <div className="text-xs text-slate-400">Dang tai tin nhan...</div>
+              <div className="text-xs text-slate-400">Đang tải tin nhắn...</div>
             )}
 
             {messages.map((message) => (
@@ -337,7 +337,7 @@ export default function AdminChat() {
                 >
                   {message.orderCode ? (
                     <div className="mb-1 text-[10px] font-semibold uppercase opacity-75">
-                      Don #{message.orderCode}
+                      Đơn #{message.orderCode}
                     </div>
                   ) : null}
                   {message.content}
@@ -346,7 +346,7 @@ export default function AdminChat() {
             ))}
 
             {!loadingMessages && messages.length === 0 && selectedUserId && (
-              <div className="text-xs text-slate-400">Chua co tin nhan nao.</div>
+              <div className="text-xs text-slate-400">Chưa có tin nhắn nào.</div>
             )}
           </div>
 

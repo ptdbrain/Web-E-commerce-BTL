@@ -91,7 +91,7 @@ const voucherToForm = (voucher = {}) => {
 };
 
 const getTargetSummary = (form) => {
-  if (form.appliesToAllProducts) return "Toan bo menu";
+  if (form.appliesToAllProducts) return "Toàn bộ menu";
   return `${form.productIds.length} mon | ${form.categoryIds.length} danh muc`;
 };
 
@@ -139,7 +139,7 @@ export default function AdminVouchers() {
     } catch (err) {
       console.error("Failed to load vouchers", err);
       setVouchers([]);
-      setError(err?.response?.data?.message || "Khong the tai voucher.");
+      setError(err?.response?.data?.message || "Không thể tải voucher.");
     } finally {
       setLoading(false);
     }
@@ -167,7 +167,7 @@ export default function AdminVouchers() {
       active: vouchers.filter((voucher) => voucher.isActive).length,
       expiringSoon: vouchers.filter(isExpiringSoon).length,
       targeted: vouchers.filter(
-        (voucher) => !voucher.appliesToAllUsers || describeVoucherScope(voucher) !== "Toan bo menu"
+        (voucher) => !voucher.appliesToAllUsers || describeVoucherScope(voucher) !== "Toàn bộ menu"
       ).length,
       totalUses: vouchers.reduce(
         (sum, voucher) => sum + Number(voucher.usedCount || 0),
@@ -284,14 +284,14 @@ export default function AdminVouchers() {
       closeForm();
     } catch (err) {
       console.error("Failed to save voucher", err);
-      setError(err?.response?.data?.message || "Khong the luu voucher.");
+      setError(err?.response?.data?.message || "Không thể lưu voucher.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteVoucher = async (voucherId) => {
-    if (!window.confirm("Xoa voucher nay?")) return;
+    if (!window.confirm("Xóa voucher này?")) return;
     setActingVoucherId(voucherId);
     setError("");
 
@@ -300,7 +300,7 @@ export default function AdminVouchers() {
       setVouchers((prev) => prev.filter((voucher) => voucher._id !== voucherId));
     } catch (err) {
       console.error("Failed to delete voucher", err);
-      setError(err?.response?.data?.message || "Khong the xoa voucher.");
+      setError(err?.response?.data?.message || "Không thể xóa voucher.");
     } finally {
       setActingVoucherId("");
     }
@@ -322,7 +322,7 @@ export default function AdminVouchers() {
       );
     } catch (err) {
       console.error("Failed to toggle voucher", err);
-      setError(err?.response?.data?.message || "Khong the cap nhat voucher.");
+      setError(err?.response?.data?.message || "Không thể cập nhật voucher.");
     } finally {
       setActingVoucherId("");
     }
@@ -466,16 +466,16 @@ export default function AdminVouchers() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <TicketPercent size={16} />
-            Tao voucher moi
+            Tạo voucher mới
           </button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Dang hoat dong", value: stats.active },
+            { label: "Đang hoạt động", value: stats.active },
             { label: "Sap het han", value: stats.expiringSoon },
             { label: "Voucher target", value: stats.targeted },
-            { label: "Tong luot su dung", value: stats.totalUses },
+            { label: "Tổng lượt sử dụng", value: stats.totalUses },
           ].map((card) => (
             <div
               key={card.label}
@@ -510,7 +510,7 @@ export default function AdminVouchers() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
             <RefreshCw size={16} />
-            Tai lai
+            Tải lại
           </button>
         </div>
 
@@ -536,10 +536,10 @@ export default function AdminVouchers() {
             <TicketPercent size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Chua co voucher nao
+            Chưa có voucher nào
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Tao voucher moi de bat dau campaign cho cua hang.
+            Tạo voucher mới để bắt đầu campaign cho cửa hàng.
           </p>
         </section>
       ) : (
@@ -558,7 +558,7 @@ export default function AdminVouchers() {
                     {formatAdminVoucherValue(voucher)}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    {voucher.description || "Khong co mo ta cho voucher nay."}
+                    {voucher.description || "Không có mô tả cho voucher này."}
                   </p>
                 </div>
 
@@ -569,19 +569,19 @@ export default function AdminVouchers() {
                       : "border border-slate-200 bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {voucher.isActive ? "Dang hoat dong" : "Tam tat"}
+                  {voucher.isActive ? "Đang hoạt động" : "Tạm tắt"}
                 </span>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Don toi thieu
+                    Đơn tối thiểu
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {voucher.minOrderValue
                       ? formatPriceAdmin(voucher.minOrderValue)
-                      : "Khong gioi han"}
+                      : "Không giới hạn"}
                   </div>
                 </div>
 
@@ -625,7 +625,7 @@ export default function AdminVouchers() {
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   <PencilLine size={16} />
-                  Chinh sua
+                  Chỉnh sửa
                 </button>
 
                 <button
@@ -651,7 +651,7 @@ export default function AdminVouchers() {
                   ) : (
                     <Trash2 size={16} />
                   )}
-                  Xoa voucher
+                  Xóa voucher
                 </button>
               </div>
             </article>
@@ -665,10 +665,10 @@ export default function AdminVouchers() {
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
-                  {editingVoucherId ? "Cap nhat voucher" : "Tao voucher moi"}
+                  {editingVoucherId ? "Cập nhật voucher" : "Tạo voucher mới"}
                 </div>
                 <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
-                  {editingVoucherId ? "Chinh sua promotion" : "FireBite promotion builder"}
+                  {editingVoucherId ? "Chỉnh sửa promotion" : "FireBite promotion builder"}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Chon muc giam, thoi gian va pham vi ap dung cho voucher.
@@ -705,7 +705,7 @@ export default function AdminVouchers() {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Mo ta</label>
+                        <label className={labelClass}>Mô tả</label>
                         <input
                           name="description"
                           value={form.description}
@@ -731,10 +731,10 @@ export default function AdminVouchers() {
                         <div>
                           <label className={labelClass}>
                             {form.discountType === "percent"
-                              ? "Gia tri (%)"
+                              ? "Giá trị (%)"
                               : form.discountType === "amount"
-                              ? "Gia tri (VND)"
-                              : "Gia tri"}
+                              ? "Giá trị (VND)"
+                              : "Giá trị"}
                           </label>
                           <input
                             type="number"
@@ -772,7 +772,7 @@ export default function AdminVouchers() {
                     <div className="mt-4 grid gap-4">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
-                          <label className={labelClass}>Don toi thieu (VND)</label>
+                          <label className={labelClass}>Đơn tối thiểu (VND)</label>
                           <input
                             type="number"
                             min="0"
@@ -916,7 +916,7 @@ export default function AdminVouchers() {
                     onClick={closeForm}
                     className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    Huy
+                    Hủy
                   </button>
                   <button
                     type="submit"
@@ -926,7 +926,7 @@ export default function AdminVouchers() {
                     {saving ? (
                       <LoaderCircle size={16} className="animate-spin" />
                     ) : null}
-                    {editingVoucherId ? "Cap nhat voucher" : "Tao voucher"}
+                    {editingVoucherId ? "Cập nhật voucher" : "Tạo voucher"}
                   </button>
                 </div>
               </div>
@@ -959,7 +959,7 @@ export default function AdminVouchers() {
 
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {userLoading ? (
-                  <div className="p-4 text-sm text-slate-400">Dang tai user...</div>
+                  <div className="p-4 text-sm text-slate-400">Đang tải user...</div>
                 ) : userResults.length > 0 ? (
                   userResults.map((user) => (
                     <label
@@ -977,7 +977,7 @@ export default function AdminVouchers() {
                     </label>
                   ))
                 ) : (
-                  <div className="p-4 text-sm text-slate-400">Khong tim thay user.</div>
+                  <div className="p-4 text-sm text-slate-400">Không tìm thấy user.</div>
                 )}
               </div>
             </div>
@@ -1009,7 +1009,7 @@ export default function AdminVouchers() {
 
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {productLoading ? (
-                  <div className="p-4 text-sm text-slate-400">Dang tai menu...</div>
+                  <div className="p-4 text-sm text-slate-400">Đang tải menu...</div>
                 ) : productResults.length > 0 ? (
                   productResults.map((product) => (
                     <label
@@ -1026,7 +1026,7 @@ export default function AdminVouchers() {
                   ))
                 ) : (
                   <div className="p-4 text-sm text-slate-400">
-                    Khong tim thay mon phu hop.
+                    Không tìm thấy món phù hợp.
                   </div>
                 )}
               </div>
@@ -1060,7 +1060,7 @@ export default function AdminVouchers() {
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {categoryLoading ? (
                   <div className="p-4 text-sm text-slate-400">
-                    Dang tai danh muc...
+                    Đang tải danh mục...
                   </div>
                 ) : categoryResults.length > 0 ? (
                   categoryResults.map((category) => (
@@ -1078,7 +1078,7 @@ export default function AdminVouchers() {
                   ))
                 ) : (
                   <div className="p-4 text-sm text-slate-400">
-                    Khong tim thay danh muc phu hop.
+                    Không tìm thấy danh mục phù hợp.
                   </div>
                 )}
               </div>
