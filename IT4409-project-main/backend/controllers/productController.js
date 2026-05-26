@@ -19,6 +19,7 @@ const uploadBufferToCloudinary = async (fileBuffer, mimetype) => {
   return res.secure_url;
 };
 
+// Xóa toàn bộ cache sản phẩm sau mỗi thao tác tạo/sửa/xóa để dữ liệu luôn mới nhất
 const clearProductsCache = async () => {
   if (!redisClient || !redisClient.isOpen) return;
   if (typeof redisClient.keys === "function") {
