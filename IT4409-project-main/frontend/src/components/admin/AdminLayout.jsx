@@ -14,38 +14,38 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 const navItems = [
   {
     to: "/admin",
-    label: "Tong quan",
-    description: "So lieu cua cua hang",
+    label: "Tổng quan",
+    description: "Số liệu của cửa hàng",
     icon: LayoutDashboard,
   },
   {
     to: "/admin/orders",
-    label: "Don hang",
-    description: "Giao, pickup va dat ban",
+    label: "Đơn hàng",
+    description: "Giao, pickup và đặt bàn",
     icon: ShoppingBag,
   },
   {
     to: "/admin/products",
     label: "Menu",
-    description: "Mon le, combo va do uong",
+    description: "Món lẻ, combo và đồ uống",
     icon: Package2,
   },
   {
     to: "/admin/categories",
-    label: "Danh muc",
-    description: "Nhom mon va icon menu",
+    label: "Danh mục",
+    description: "Nhóm món và icon menu",
     icon: FolderTree,
   },
   {
     to: "/admin/vouchers",
     label: "Voucher",
-    description: "Ma giam gia va campaign",
+    description: "Mã giảm giá và campaign",
     icon: TicketPercent,
   },
   {
     to: "/admin/chat",
     label: "Chat",
-    description: "Ho tro khach dang dat mon",
+    description: "Hỗ trợ khách đang đặt món",
     icon: MessagesSquare,
   },
 ];
@@ -93,10 +93,10 @@ export const AdminLayout = ({ onLogout }) => {
                 FireBite
               </h1>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Dieu pho menu, don hang va ho tro khach trong cung mot giao dien.
+                Điều phối menu, đơn hàng và hỗ trợ khách trong cùng một giao diện.
               </p>
               <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-orange-200">
-                Mo storefront
+                Mở storefront
                 <ChevronRight size={16} />
               </div>
             </button>
@@ -137,18 +137,18 @@ export const AdminLayout = ({ onLogout }) => {
               <div className="mt-4 rounded-2xl bg-slate-950 p-4 text-slate-200">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <BarChart3 size={16} className="text-orange-300" />
-                  Van hanh trong ngay
+                  Vận hành trong ngày
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Kiem tra nhanh menu, don dang xu ly va voucher dang chay truoc
-                  khung gio cao diem.
+                  Kiểm tra nhanh menu, đơn đang xử lý và voucher đang chạy trước
+                  khung giờ cao điểm.
                 </p>
                 <button
                   type="button"
                   onClick={onLogout}
                   className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                 >
-                  Dang xuat admin
+                  Đăng xuất admin
                 </button>
               </div>
             </div>
@@ -171,9 +171,9 @@ export const AdminLayout = ({ onLogout }) => {
               </div>
 
               <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-                <div className="font-semibold">Mot cua hang, ba kieu nhan mon</div>
+                <div className="font-semibold">Một cửa hàng, ba kiểu nhận món</div>
                 <div className="mt-1 text-orange-600">
-                  Delivery, pickup va dine-in da duoc gom chung trong luong admin.
+                  Delivery, pickup và dine-in đã được gom chung trong luồng admin.
                 </div>
               </div>
             </div>

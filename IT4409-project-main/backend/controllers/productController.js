@@ -4,6 +4,7 @@ import Category from "../models/Category.js";
 import cloudinary from "../config/cloudinary.js";
 import { redisClient } from "../config/redis.js";
 import { normalizeMenuProductPayload } from "../utils/menuDomain.js";
+import { normalizeProductImageUrls } from "../utils/productImages.js";
 import {
   buildProductFilter,
   buildProductVisibilityFilter,
@@ -68,7 +69,11 @@ const uploadImages = async (files = []) => {
 export const createProduct = async (req, res) => {
   try {
     const normalized = normalizeMenuProductPayload(req.body);
-    const images = await uploadImages(req.files || []);
+    const uploadedImages = await uploadImages(req.files || []);
+    const imageUrls = normalizeProductImageUrls(
+      req.body.imageUrls ?? req.body.images
+    );
+    const images = [...imageUrls, ...uploadedImages].slice(0, 6);
     const category = await resolveCategoryId(req.body.category);
 
     if (!category) {
@@ -477,9 +482,17 @@ export const updateProduct = async (req, res) => {
     if (category !== undefined) product.category = category;
     if (req.body.category === "") product.category = undefined;
 
-    const images = await uploadImages(req.files || []);
-    if (images.length) {
-      product.images = images;
+    const uploadedImages = await uploadImages(req.files || []);
+    const hasImageUrlPayload = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "imageUrls"
+    );
+    const imageUrls = normalizeProductImageUrls(
+      req.body.imageUrls ?? req.body.images
+    );
+    const nextImages = [...imageUrls, ...uploadedImages].slice(0, 6);
+    if (hasImageUrlPayload || uploadedImages.length) {
+      product.images = nextImages;
     }
 
     await product.save();

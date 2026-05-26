@@ -27,9 +27,9 @@ const statusFilters = [
   { value: "all", label: "Tat ca" },
   { value: "waiting_for_payment", label: "Cho thanh toan" },
   { value: "pending", label: "Cho xu ly" },
-  { value: "preparing", label: "Dang che bien" },
-  { value: "ready", label: "San sang giao" },
-  { value: "shipping", label: "Dang phuc vu" },
+  { value: "preparing", label: "Đang chế biến" },
+  { value: "ready", label: "Sẵn sàng giao" },
+  { value: "shipping", label: "Đang phục vụ" },
   { value: "confirmed", label: "Hoan tat" },
   { value: "cancelled", label: "Da huy" },
   { value: "refunded", label: "Da hoan tien" },
@@ -54,7 +54,7 @@ const getFulfillmentDetail = (order) => {
     return `${guestCount} khach • ${formatDateTime(order.tableBooking?.bookingTime)}`;
   }
 
-  return order.shippingAddress || "Chua co dia chi giao hang";
+  return order.shippingAddress || "Chưa có địa chỉ giao hàng";
 };
 
 const canConfirmOrder = (status) =>
@@ -65,12 +65,12 @@ const canCancelOrder = (status) =>
 const getConfirmActionLabel = (order) => {
   if (order.orderStatus === "pending") return "Chuyen bep";
   if (order.orderStatus === "preparing") {
-    return order.fulfillmentType === "delivery" ? "Chuyen giao hang" : "San sang giao mon";
+    return order.fulfillmentType === "delivery" ? "Chuyển giao hàng" : "Sẵn sàng giao món";
   }
   if (order.orderStatus === "ready" || order.orderStatus === "shipping") {
     return "Hoan tat don";
   }
-  return "Cap nhat don";
+  return "Cập nhật đơn";
 };
 
 export const AdminOrders = () => {
@@ -102,7 +102,7 @@ export const AdminOrders = () => {
       setOrders(Array.isArray(response.data?.orders) ? response.data.orders : []);
     } catch (err) {
       console.error("Failed to load orders", err);
-      setError(err?.response?.data?.message || "Khong the tai danh sach don.");
+      setError(err?.response?.data?.message || "Không thể tải danh sách đơn.");
       setOrders([]);
     } finally {
       setLoading(false);
@@ -174,7 +174,7 @@ export const AdminOrders = () => {
         )
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Khong the xac nhan don hang.");
+      alert(err?.response?.data?.message || "Không thể xác nhận đơn hàng.");
     } finally {
       setActingId("");
     }
@@ -183,7 +183,7 @@ export const AdminOrders = () => {
   const handleCancelOrder = async (orderId) => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    if (!window.confirm("Huy don hang nay?")) return;
+    if (!window.confirm("Hủy đơn hàng này?")) return;
 
     setActingId(orderId);
 
@@ -202,7 +202,7 @@ export const AdminOrders = () => {
         )
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Khong the huy don hang.");
+      alert(err?.response?.data?.message || "Không thể hủy đơn hàng.");
     } finally {
       setActingId("");
     }
@@ -214,7 +214,7 @@ export const AdminOrders = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-100">
-              Don hang toan cua hang
+              Đơn hàng toàn cửa hàng
             </div>
             <h2 className="mt-4 font-display text-3xl font-black tracking-tight">
               FireBite Order Desk
@@ -231,14 +231,14 @@ export const AdminOrders = () => {
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <RefreshCw size={16} />
-            Tai lai danh sach
+            Tải lại danh sách
           </button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Tong don", value: stats.total },
-            { label: "Dang xu ly", value: stats.processing },
+            { label: "Tổng đơn", value: stats.total },
+            { label: "Đang xử lý", value: stats.processing },
             { label: "Delivery", value: stats.delivery },
             { label: "Dat ban", value: stats.dineIn },
           ].map((card) => (
@@ -327,7 +327,7 @@ export const AdminOrders = () => {
             <Truck size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Khong tim thay don nao
+            Không tìm thấy đơn nào
           </h3>
           <p className="mt-2 text-sm text-slate-500">
             Thu doi tu khoa tim kiem hoac bo loc trang thai.
@@ -375,7 +375,7 @@ export const AdminOrders = () => {
                         {order.customerName}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {order.customerPhone || "Khong co so dien thoai"}
+                        {order.customerPhone || "Không có số điện thoại"}
                       </div>
                     </div>
 
@@ -390,7 +390,7 @@ export const AdminOrders = () => {
 
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Tao luc
+                        Tạo lúc
                       </div>
                       <div className="mt-1 text-sm font-medium text-slate-700">
                         {formatDateTime(order.createdAt)}
@@ -418,7 +418,7 @@ export const AdminOrders = () => {
                 <div className="w-full xl:w-[260px]">
                   <div className="rounded-[24px] bg-slate-950 p-5 text-white">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Tong don
+                      Tổng đơn
                     </div>
                     <div className="mt-2 font-display text-3xl font-black">
                       {formatPriceAdmin(order.totalPrice)}
@@ -465,7 +465,7 @@ export const AdminOrders = () => {
                         ) : (
                           <X size={16} />
                         )}
-                        Huy don
+                        Hủy đơn
                       </button>
                     ) : null}
                   </div>

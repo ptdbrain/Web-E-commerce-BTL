@@ -5,80 +5,80 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 
 const statusMeta = {
   waiting_for_payment: {
-    label: "Cho thanh toan",
+    label: "Chờ thanh toán",
     className: "border border-orange-200 bg-orange-50 text-orange-700",
   },
   pending: {
-    label: "Cho xu ly",
+    label: "Chờ xử lý",
     className: "border border-amber-200 bg-amber-50 text-amber-700",
   },
   preparing: {
-    label: "Dang che bien",
+    label: "Đang chế biến",
     className: "border border-sky-200 bg-sky-50 text-sky-700",
   },
   ready: {
-    label: "San sang giao",
+    label: "Sẵn sàng giao",
     className: "border border-lime-200 bg-lime-50 text-lime-700",
   },
   shipping: {
-    label: "Dang phuc vu",
+    label: "Đang phục vụ",
     className: "border border-violet-200 bg-violet-50 text-violet-700",
   },
   confirmed: {
-    label: "Hoan tat",
+    label: "Hoàn tất",
     className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
   },
   cancelled: {
-    label: "Da huy",
+    label: "Đã hủy",
     className: "border border-rose-200 bg-rose-50 text-rose-700",
   },
   refunded: {
-    label: "Da hoan tien",
+    label: "Đã hoàn tiền",
     className: "border border-slate-200 bg-slate-100 text-slate-700",
   },
 };
 
 const fulfillmentMeta = {
   delivery: {
-    label: "Giao hang",
+    label: "Giao hàng",
     className: "border border-orange-200 bg-orange-50 text-orange-700",
   },
   pickup: {
-    label: "Tu den lay",
+    label: "Tự đến lấy",
     className: "border border-cyan-200 bg-cyan-50 text-cyan-700",
   },
   dine_in: {
-    label: "Dat ban",
+    label: "Đặt bàn",
     className: "border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700",
   },
 };
 
 const paymentMeta = {
-  cash: "Tien mat",
+  cash: "Tiền mặt",
   zalopay: "ZaloPay",
-  card: "The ngan hang",
+  card: "Thẻ ngân hàng",
   vnpay: "VNPay",
 };
 
 const paymentStatusMeta = {
   unpaid: {
-    label: "Chua thu tien",
+    label: "Chưa thu tiền",
     className: "border border-slate-200 bg-slate-50 text-slate-600",
   },
   waiting: {
-    label: "Cho thanh toan",
+    label: "Chờ thanh toán",
     className: "border border-orange-200 bg-orange-50 text-orange-700",
   },
   paid: {
-    label: "Da thanh toan",
+    label: "Đã thanh toán",
     className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
   },
   failed: {
-    label: "Thanh toan loi",
+    label: "Thanh toán lỗi",
     className: "border border-rose-200 bg-rose-50 text-rose-700",
   },
   refunded: {
-    label: "Da hoan tien",
+    label: "Đã hoàn tiền",
     className: "border border-slate-200 bg-slate-100 text-slate-700",
   },
 };
@@ -99,6 +99,11 @@ export const splitTags = (value) =>
     .split(/[\r\n,]+/)
     .map((item) => item.trim())
     .filter(Boolean);
+
+export const splitImageUrls = (value) =>
+  splitTextLines(value)
+    .filter((item) => /^https?:\/\//i.test(item) || item.startsWith("/"))
+    .slice(0, 6);
 
 export const sanitizeSizes = (sizes = []) => {
   const nextSizes = (Array.isArray(sizes) ? sizes : [])
@@ -161,6 +166,7 @@ export const createEmptyAdminProductForm = () => ({
   isBestSeller: false,
   isNew: false,
   existingImages: [],
+  imageUrlsText: "",
   imageFiles: [],
 });
 
@@ -209,6 +215,7 @@ export const normalizeAdminProductForm = (product = {}) => ({
   isBestSeller: Boolean(product.isBestSeller),
   isNew: Boolean(product.isNew),
   existingImages: Array.isArray(product.images) ? product.images : [],
+  imageUrlsText: Array.isArray(product.images) ? product.images.join("\n") : "",
   imageFiles: [],
 });
 
@@ -252,6 +259,7 @@ export const buildAdminProductPayload = (formState = {}) => {
   payload.append("isActive", String(formState.isActive !== false));
   payload.append("isBestSeller", String(Boolean(formState.isBestSeller)));
   payload.append("isNew", String(Boolean(formState.isNew)));
+  payload.append("imageUrls", JSON.stringify(splitImageUrls(formState.imageUrlsText)));
 
   (Array.isArray(formState.imageFiles) ? formState.imageFiles : []).forEach((file) => {
     payload.append("images", file);
@@ -268,10 +276,10 @@ export const describeVoucherScope = (voucher = {}) => {
     voucher.appliesToAllProducts ||
     (productCount === 0 && categoryCount === 0)
   ) {
-    return "Toan bo menu";
+    return "Toàn bộ menu";
   }
 
-  return `${productCount} mon | ${categoryCount} danh muc`;
+  return `${productCount} món | ${categoryCount} danh mục`;
 };
 
 export const formatAdminVoucherValue = (voucher = {}) => {
