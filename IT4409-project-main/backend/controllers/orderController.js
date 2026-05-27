@@ -466,7 +466,7 @@ export const confirmOrderByAdmin = async (req, res) => {
     if (!nextStatus) {
       return res
         .status(400)
-        .json({ message: "Khong the xac nhan don hang o trang thai nay" });
+        .json({ message: "Không thể cập nhật đơn hàng ở trạng thái này" });
     }
 
     order.orderStatus = nextStatus;
@@ -481,8 +481,8 @@ export const confirmOrderByAdmin = async (req, res) => {
     return res.json({
       order,
       message: actionLabel
-        ? `${actionLabel} thanh cong`
-        : "Da cap nhat trang thai don hang",
+        ? `${actionLabel} thành công`
+        : "Đã cập nhật trạng thái đơn hàng",
     });
   } catch (err) {
     console.error("confirmOrderByAdmin error:", err);
@@ -504,7 +504,7 @@ export const cancelOrderByAdmin = async (req, res) => {
     }
 
     if (order.orderStatus === EOrderStatus.Cancelled) {
-      return res.status(400).json({ message: "Don hang da bi huy roi" });
+      return res.status(400).json({ message: "Đơn hàng đã bị hủy rồi" });
     }
 
     await releaseOrderReservations(order);
@@ -517,7 +517,7 @@ export const cancelOrderByAdmin = async (req, res) => {
     }
     await order.save();
 
-    return res.json({ order, message: "Don hang da duoc huy" });
+    return res.json({ order, message: "Đơn hàng đã được hủy" });
   } catch (err) {
     console.error("cancelOrderByAdmin error:", err);
     return res.status(500).json({ message: "Server error" });

@@ -610,7 +610,7 @@ export default function AdminVouchers() {
                   </div>
                   <div className="mt-1 text-sm font-medium text-slate-700">
                     {voucher.appliesToAllUsers
-                      ? "Tat ca user"
+                      ? "Tất cả user"
                       : `${voucher.users?.length || 0} user`}
                     {" | "}
                     {describeVoucherScope(voucher)}
