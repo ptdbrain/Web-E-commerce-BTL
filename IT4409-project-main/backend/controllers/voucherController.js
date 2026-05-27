@@ -16,7 +16,7 @@ import { calculateVoucherPricing } from "../utils/voucherPricing.js";
 
 const buildSearchRegex = (value) =>
   value && typeof value === "string" && value.trim()
-    ? new RegExp(value.trim(), "i")
+    ? new RegExp(value.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
     : null;
 
 const enrichPricingItems = async (items = []) => {
@@ -127,18 +127,18 @@ export const getAvailableVouchersForUser = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const now = new Date();
     const available = vouchers.filter((voucher) => {
-      const result = calculateVoucherPricing({
-        voucher,
-        userId,
-        items: [],
-        orderTotal: voucher.minOrderValue || 0,
-        deliveryFee: 0,
-        fulfillmentType: "delivery",
-        nowDate: new Date(),
-      });
-
-      return !result.errorMessage || /mon nao/i.test(result.errorMessage);
+      if (voucher.maxUsage && voucher.maxUsage > 0 && voucher.usedCount >= voucher.maxUsage) {
+        return false;
+      }
+      if (voucher.startDate && new Date(voucher.startDate) > now) return false;
+      if (voucher.endDate && new Date(voucher.endDate) < now) return false;
+      if (!voucher.appliesToAllUsers) {
+        const allowedUsers = new Set((voucher.users || []).map((id) => String(id)));
+        if (!allowedUsers.has(String(userId))) return false;
+      }
+      return true;
     });
 
     return res.json({
@@ -230,12 +230,16 @@ export const deleteVoucher = async (req, res) => {
       return res.status(400).json({ message: "ID voucher khong hop le." });
     }
 
-    const voucher = await Voucher.findByIdAndDelete(id).lean();
+    const voucher = await Voucher.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true }
+    ).lean();
     if (!voucher) {
       return res.status(404).json({ message: "Khong tim thay voucher." });
     }
 
-    return res.json({ message: "Da xoa voucher." });
+    return res.json({ voucher, message: "Da vo hieu hoa voucher." });
   } catch (err) {
     console.error("deleteVoucher error", err);
     return res.status(500).json({ message: "Loi server khi xoa voucher." });

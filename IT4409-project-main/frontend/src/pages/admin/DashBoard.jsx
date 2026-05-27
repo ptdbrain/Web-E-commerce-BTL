@@ -36,7 +36,7 @@ export default function Dashboard() {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(buildApiUrl("/orders"), {
+      const response = await axios.get(buildApiUrl("/orders?limit=200"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setOrders(Array.isArray(response.data?.orders) ? response.data.orders : []);
