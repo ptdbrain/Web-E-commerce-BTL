@@ -33,18 +33,35 @@ const clearProductsCache = async () => {
   }
 };
 
+const escapeRegExp = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const resolveCategoryId = async (category) => {
   if (!category) return undefined;
   if (mongoose.Types.ObjectId.isValid(category)) return category;
 
+  const categoryPattern = escapeRegExp(category);
   const found = await Category.findOne({
     $or: [
-      { name: { $regex: `^${category}$`, $options: "i" } },
-      { slug: { $regex: `^${category}$`, $options: "i" } },
+      { name: { $regex: `^${categoryPattern}$`, $options: "i" } },
+      { slug: { $regex: `^${categoryPattern}$`, $options: "i" } },
     ],
+    isActive: { $ne: false },
   });
 
   return found?._id;
+};
+
+const validateProductPayload = (payload = {}) => {
+  if (!payload.name) return "Product name is required";
+  if (!payload.slug) return "Product slug is required";
+  if (!Number.isFinite(payload.price) || payload.price <= 0) {
+    return "Product price must be greater than 0";
+  }
+  if (!Number.isFinite(payload.stock) || payload.stock < 0) {
+    return "Product stock cannot be negative";
+  }
+  return null;
 };
 
 const uploadImages = async (files = []) => {
@@ -69,6 +86,11 @@ const uploadImages = async (files = []) => {
 export const createProduct = async (req, res) => {
   try {
     const normalized = normalizeMenuProductPayload(req.body);
+    const validationError = validateProductPayload(normalized);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     const uploadedImages = await uploadImages(req.files || []);
     const imageUrls = normalizeProductImageUrls(
       req.body.imageUrls ?? req.body.images
@@ -455,7 +477,15 @@ export const updateProduct = async (req, res) => {
       ...product.toObject(),
       ...req.body,
     });
+    const validationError = validateProductPayload(normalized);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     const category = await resolveCategoryId(req.body.category);
+    if (Object.prototype.hasOwnProperty.call(req.body, "category") && !category) {
+      return res.status(400).json({ message: "Category is required" });
+    }
 
     product.name = normalized.name;
     product.slug = normalized.slug;

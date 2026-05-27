@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import Category, { DEFAULT_CATEGORIES } from "../models/Category.js";
+import Product from "../models/Product.js";
 import {
   normalizeCategoryPayload,
   sortCategoriesForMenu,
@@ -107,6 +108,11 @@ export const deleteCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({ message: "Khong tim thay danh muc." });
     }
+
+    await Product.updateMany(
+      { category: category._id },
+      { isActive: false, isAvailable: false }
+    );
 
     return res.json({ category, message: "Da an danh muc." });
   } catch (err) {

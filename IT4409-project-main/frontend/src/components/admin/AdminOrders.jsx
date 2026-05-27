@@ -96,7 +96,7 @@ export const AdminOrders = () => {
     setError("");
 
     try {
-      const response = await axios.get(buildApiUrl("/orders"), {
+      const response = await axios.get(buildApiUrl("/orders?limit=200"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(Array.isArray(response.data?.orders) ? response.data.orders : []);

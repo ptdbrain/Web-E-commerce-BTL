@@ -14,8 +14,13 @@ import {
   priceOrderItemsFromProducts,
 } from "../utils/orderPricing.js";
 import {
+  canCancelOrder,
+  canCompleteOrder,
+  canRequestRefund,
   getAdminOrderActionLabel,
   getAdminOrderAdvance,
+  isPaymentExpired,
+  PAYMENT_EXPIRY_MINUTES,
 } from "../utils/orderWorkflow.js";
 
 const getProductIdsFromItems = (items = []) =>
@@ -107,6 +112,27 @@ const releaseOrderReservations = async (order) => {
   if (!order || !order.stockReserved || order.stockReleased) return;
   await releaseInventoryForItems(order.items || []);
   order.stockReleased = true;
+};
+
+const expireStalePaymentOrders = async () => {
+  const cutoff = new Date(Date.now() - PAYMENT_EXPIRY_MINUTES * 60 * 1000);
+  const staleOrders = await Order.find({
+    orderStatus: EOrderStatus.WaitingForPayment,
+    paymentStatus: EPaymentStatus.Waiting,
+    createdAt: { $lt: cutoff },
+  });
+
+  for (const order of staleOrders) {
+    if (!isPaymentExpired(order)) continue;
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
+    order.orderStatus = EOrderStatus.Cancelled;
+    order.paymentStatus = EPaymentStatus.Failed;
+    order.note = [order.note, "Auto-cancelled because online payment expired."]
+      .filter(Boolean)
+      .join("\n");
+    await order.save();
+  }
 };
 
 export const createOrder = async (req, res) => {
@@ -286,6 +312,8 @@ export const getMyOrders = async (req, res) => {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
+    await expireStalePaymentOrders();
+
     const orders = await Order.find({ customerId })
       .sort({ createdAt: -1 })
       .lean();
@@ -298,8 +326,22 @@ export const getMyOrders = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
-    return res.json({ orders });
+    await expireStalePaymentOrders();
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+    const [orders, total] = await Promise.all([
+      Order.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Order.countDocuments({}),
+    ]);
+
+    return res.json({
+      orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 0,
+    });
   } catch (err) {
     console.error("getAllOrders error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -420,8 +462,8 @@ export const cancelOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    if (order.orderStatus === EOrderStatus.Cancelled) {
-      return res.status(400).json({ message: "Order already cancelled" });
+    if (!canCancelOrder(order.orderStatus)) {
+      return res.status(400).json({ message: "Order cannot be cancelled at this stage" });
     }
 
     await releaseOrderReservations(order);
@@ -503,7 +545,7 @@ export const cancelOrderByAdmin = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus === EOrderStatus.Cancelled) {
+    if ([EOrderStatus.Cancelled, EOrderStatus.Confirmed, EOrderStatus.Refunded].includes(order.orderStatus)) {
       return res.status(400).json({ message: "Đơn hàng đã bị hủy rồi" });
     }
 
@@ -541,7 +583,7 @@ export const receiveOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus !== EOrderStatus.Shipping) {
+    if (!canCompleteOrder(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
         .json({ message: "Chi co the hoan tat khi don dang duoc xu ly" });
@@ -577,7 +619,7 @@ export const refundOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus !== EOrderStatus.Shipping) {
+    if (!canRequestRefund(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
         .json({ message: "Chi co the yeu cau hoan tien khi don dang xu ly" });
