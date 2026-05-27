@@ -24,34 +24,34 @@ import {
 } from "./utils";
 
 const statusFilters = [
-  { value: "all", label: "Tat ca" },
-  { value: "waiting_for_payment", label: "Cho thanh toan" },
-  { value: "pending", label: "Cho xu ly" },
+  { value: "all", label: "Tất cả" },
+  { value: "waiting_for_payment", label: "Chờ thanh toán" },
+  { value: "pending", label: "Chờ xử lý" },
   { value: "preparing", label: "Đang chế biến" },
   { value: "ready", label: "Sẵn sàng giao" },
   { value: "shipping", label: "Đang phục vụ" },
-  { value: "confirmed", label: "Hoan tat" },
-  { value: "cancelled", label: "Da huy" },
-  { value: "refunded", label: "Da hoan tien" },
+  { value: "confirmed", label: "Hoàn tất" },
+  { value: "cancelled", label: "Đã hủy" },
+  { value: "refunded", label: "Đã hoàn tiền" },
 ];
 
 const fulfillmentFilters = [
-  { value: "all", label: "Moi hinh thuc" },
-  { value: "delivery", label: "Giao hang" },
-  { value: "pickup", label: "Tu den lay" },
-  { value: "dine_in", label: "Dat ban" },
+  { value: "all", label: "Mọi hình thức" },
+  { value: "delivery", label: "Giao hàng" },
+  { value: "pickup", label: "Tự đến lấy" },
+  { value: "dine_in", label: "Đặt bàn" },
 ];
 
 const getFulfillmentDetail = (order) => {
   if (order.fulfillmentType === "pickup") {
     return order.pickupTime
-      ? `Lay mon luc ${formatDateTime(order.pickupTime)}`
-      : "Khach tu den lay tai quay";
+      ? `Lấy món lúc ${formatDateTime(order.pickupTime)}`
+      : "Khách tự đến lấy tại quầy";
   }
 
   if (order.fulfillmentType === "dine_in") {
     const guestCount = order.tableBooking?.guestCount || 0;
-    return `${guestCount} khach • ${formatDateTime(order.tableBooking?.bookingTime)}`;
+    return `${guestCount} khách - ${formatDateTime(order.tableBooking?.bookingTime)}`;
   }
 
   return order.shippingAddress || "Chưa có địa chỉ giao hàng";
@@ -63,12 +63,12 @@ const canCancelOrder = (status) =>
   !["cancelled", "confirmed", "refunded"].includes(status);
 
 const getConfirmActionLabel = (order) => {
-  if (order.orderStatus === "pending") return "Chuyen bep";
+  if (order.orderStatus === "pending") return "Nhận đơn";
   if (order.orderStatus === "preparing") {
     return order.fulfillmentType === "delivery" ? "Chuyển giao hàng" : "Sẵn sàng giao món";
   }
   if (order.orderStatus === "ready" || order.orderStatus === "shipping") {
-    return "Hoan tat don";
+    return "Hoàn tất đơn";
   }
   return "Cập nhật đơn";
 };
@@ -88,7 +88,7 @@ export const AdminOrders = () => {
   const loadOrders = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Can dang nhap voi quyen admin de xem don hang.");
+      setError("Cần đăng nhập với quyền admin để xem đơn hàng.");
       return;
     }
 
@@ -220,8 +220,8 @@ export const AdminOrders = () => {
               FireBite Order Desk
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Theo doi don giao hang, pickup va dat ban trong cung mot bang dieu
-              phoi.
+              Theo dõi đơn giao hàng, pickup và đặt bàn trong cùng một bảng điều
+              phối.
             </p>
           </div>
 
@@ -434,7 +434,7 @@ export const AdminOrders = () => {
                       onClick={() => setSelectedOrder(order)}
                       className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
-                      Xem chi tiet
+                      Xem chi tiết
                     </button>
 
                     {canConfirmOrder(order.orderStatus) ? (
