@@ -66,6 +66,7 @@ const resetCatalogCollections = async () => {
     ChatSupport.deleteMany({}),
     Review.deleteMany({}),
     Order.deleteMany({}),
+    User.deleteMany({}),
   ]);
 };
 
