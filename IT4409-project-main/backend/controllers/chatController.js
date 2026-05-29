@@ -3,23 +3,11 @@ import ChatMessage from "../models/ChatMessage.js";
 import ChatSupport from "../models/ChatSupport.js";
 import Order from "../models/Order.js";
 import User from "../models/user.js";
+import { buildSystemPrompt } from "../data/chatKnowledge.js";
 
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
   : null;
-
-const SYSTEM_PROMPT = `Bạn là trợ lý AI của FireBite — chuỗi fast food chuyên burger, gà rán, cơm tô, mì ý, combo và đồ uống.
-Địa chỉ: 256 Lê Thanh Nghị, Hai Bà Trưng, Hà Nội. Giờ mở cửa: 09:00 - 22:30 mỗi ngày. Hotline: 1900 6868.
-
-Nhiệm vụ của bạn:
-- Tư vấn món ăn, combo phù hợp với khẩu vị và ngân sách khách hàng
-- Giải đáp thắc mắc về menu, giá, thành phần, độ cay
-- Hỗ trợ thông tin về đơn hàng, giao hàng, thanh toán
-- Giới thiệu khuyến mãi và combo tiết kiệm
-- Trả lời ngắn gọn, thân thiện, dùng tiếng Việt
-- Nếu câu hỏi quá phức tạp hoặc liên quan đến đơn hàng cụ thể, đề nghị khách chờ admin hỗ trợ
-
-Đừng bịa thông tin. Đừng trả lời các chủ đề không liên quan đến nhà hàng.`;
 
 export const sendChatMessage = async (req, res) => {
   try {
@@ -68,7 +56,7 @@ export const sendChatMessage = async (req, res) => {
         const completion = await groq.chat.completions.create({
           model: "llama-3.3-70b-versatile",
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: buildSystemPrompt() },
             ...historyMessages,
           ],
           max_tokens: 300,
