@@ -1,7 +1,25 @@
+import Groq from "groq-sdk";
 import ChatMessage from "../models/ChatMessage.js";
 import ChatSupport from "../models/ChatSupport.js";
 import Order from "../models/Order.js";
 import User from "../models/user.js";
+
+const groq = process.env.GROQ_API_KEY
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY })
+  : null;
+
+const SYSTEM_PROMPT = `Bạn là trợ lý AI của FireBite — chuỗi fast food chuyên burger, gà rán, cơm tô, mì ý, combo và đồ uống.
+Địa chỉ: 256 Lê Thanh Nghị, Hai Bà Trưng, Hà Nội. Giờ mở cửa: 09:00 - 22:30 mỗi ngày. Hotline: 1900 6868.
+
+Nhiệm vụ của bạn:
+- Tư vấn món ăn, combo phù hợp với khẩu vị và ngân sách khách hàng
+- Giải đáp thắc mắc về menu, giá, thành phần, độ cay
+- Hỗ trợ thông tin về đơn hàng, giao hàng, thanh toán
+- Giới thiệu khuyến mãi và combo tiết kiệm
+- Trả lời ngắn gọn, thân thiện, dùng tiếng Việt
+- Nếu câu hỏi quá phức tạp hoặc liên quan đến đơn hàng cụ thể, đề nghị khách chờ admin hỗ trợ
+
+Đừng bịa thông tin. Đừng trả lời các chủ đề không liên quan đến nhà hàng.`;
 
 export const sendChatMessage = async (req, res) => {
   try {
@@ -20,12 +38,12 @@ export const sendChatMessage = async (req, res) => {
     if (orderId) {
       const order = await Order.findOne({ _id: orderId, customerId: userId }).select("_id");
       if (!order) {
-        return res.status(404).json({ message: "Khong tim thay don hang de ho tro." });
+        return res.status(404).json({ message: "Không tìm thấy đơn hàng để hỗ trợ." });
       }
       linkedOrderId = order._id;
     }
 
-    // Lưu tin nhắn của người dùng, không gọi AI
+    // Lưu tin nhắn người dùng
     const userMsg = await ChatMessage.create({
       user: userId,
       order: linkedOrderId,
@@ -33,6 +51,59 @@ export const sendChatMessage = async (req, res) => {
       content: message,
       isReadByAdmin: false,
     });
+
+    // Gọi AI nếu có API key
+    if (groq) {
+      try {
+        const recentHistory = await ChatMessage.find({ user: userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean();
+
+        const historyMessages = recentHistory.reverse().map((m) => ({
+          role: m.role === "user" ? "user" : "assistant",
+          content: m.content,
+        }));
+
+        const completion = await groq.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...historyMessages,
+          ],
+          max_tokens: 300,
+          temperature: 0.7,
+        });
+
+        const aiReply = completion.choices[0]?.message?.content?.trim();
+
+        if (aiReply) {
+          const aiMsg = await ChatMessage.create({
+            user: userId,
+            order: linkedOrderId,
+            role: "assistant",
+            content: aiReply,
+          });
+
+          return res.json({
+            message: {
+              id: userMsg._id,
+              role: userMsg.role,
+              content: userMsg.content,
+              createdAt: userMsg.createdAt,
+            },
+            aiReply: {
+              id: aiMsg._id,
+              role: aiMsg.role,
+              content: aiMsg.content,
+              createdAt: aiMsg.createdAt,
+            },
+          });
+        }
+      } catch (aiErr) {
+        console.error("Groq AI error:", aiErr?.message || aiErr);
+      }
+    }
 
     return res.json({
       message: {
