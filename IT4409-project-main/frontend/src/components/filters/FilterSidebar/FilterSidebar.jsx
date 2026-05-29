@@ -2,10 +2,10 @@ import React from "react";
 import "./FilterSidebar.css";
 
 const PRICE_PRESETS = [
-  { label: "Dưới 5.000.000đ",         value: { min: 0,       max: 5000000  } },
-  { label: "5.000.000đ – 10.000.000đ", value: { min: 5000000, max: 10000000 } },
-  { label: "10.000.000đ – 20.000.000đ",value: { min: 10000000,max: 20000000 } },
-  { label: "Trên 20.000.000đ",         value: { min: 20000000,max: Infinity } },
+  { label: "Dưới 50.000đ",          value: { min: 0,      max: 50000  } },
+  { label: "50.000đ – 100.000đ",    value: { min: 50000,  max: 100000 } },
+  { label: "100.000đ – 200.000đ",   value: { min: 100000, max: 200000 } },
+  { label: "Trên 200.000đ",         value: { min: 200000, max: Infinity } },
 ];
 
 const ITEM_TYPE_OPTIONS = [
