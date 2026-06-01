@@ -1,6 +1,12 @@
 import User from "../models/user.js";
 import bcrypt from "bcryptjs";
 
+// Hàm kiểm tra độ phức tạp của mật khẩu đồng bộ với authController
+const isStrongPassword = (password) => {
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+};
+
 // Lấy thông tin tài khoản của chính user (role customer)
 export const getMe = async (req, res) => {
   try {
@@ -78,6 +84,13 @@ export const changePassword = async (req, res) => {
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu." });
+    }
+
+    // Kiểm tra độ phức tạp của mật khẩu mới
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({ 
+        message: "Mật khẩu mới phải dài ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt." 
+      });
     }
 
     if (newPassword !== confirmPassword) {
