@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 import {
 	sendChatMessage,
 	getChatHistory,
@@ -26,7 +26,7 @@ router.get("/chat/support-status", authenticateToken, getUserSupportStatus);
 router.get(
 	"/admin/chat/conversations",
 	authenticateToken,
-	authorizeRole("admin"),
+	authorizeRoles("admin"),
 	getConversationsForAdmin
 );
 
@@ -34,7 +34,7 @@ router.get(
 router.get(
 	"/admin/chat/:userId",
 	authenticateToken,
-	authorizeRole("admin"),
+	authorizeRoles("admin"),
 	getChatHistoryForAdmin
 );
 
@@ -42,7 +42,7 @@ router.get(
 router.post(
 	"/admin/chat/:userId",
 	authenticateToken,
-	authorizeRole("admin"),
+	authorizeRoles("admin"),
 	adminSendMessage
 );
 
@@ -50,7 +50,7 @@ router.post(
 router.post(
 	"/admin/chat/:userId/join",
 	authenticateToken,
-	authorizeRole("admin"),
+	authorizeRoles("admin"),
 	adminJoinSupport
 );
 
@@ -58,7 +58,7 @@ router.post(
 router.post(
 	"/admin/chat/:userId/end",
 	authenticateToken,
-	authorizeRole("admin"),
+	authorizeRoles("admin"),
 	adminEndSupport
 );
 

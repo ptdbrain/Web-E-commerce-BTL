@@ -6,11 +6,11 @@ import {
   getCategories,
   updateCategory,
 } from "../controllers/categoryController.js";
-import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
-const requireAdmin = [authenticateToken, authorizeRole("admin")];
+const requireAdmin = [authenticateToken, authorizeRoles("admin")];
 
 router.get("/categories", getCategories);
 router.get("/admin/categories", ...requireAdmin, getAdminCategories);

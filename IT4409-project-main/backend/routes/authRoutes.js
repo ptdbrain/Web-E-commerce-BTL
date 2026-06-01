@@ -1,7 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
 import * as authController from "../controllers/authController.js";
-import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 import { verifyCaptcha } from "../middleware/captcha.js";
 
 const router = express.Router();
@@ -39,7 +39,7 @@ router.get("/profile", authenticateToken, authController.profile);
 router.get(
   "/admin-only",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   authController.adminOnly
 );
 

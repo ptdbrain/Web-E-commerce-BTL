@@ -13,7 +13,7 @@ import {
   searchUsersForVoucher,
   updateVoucher,
 } from "../controllers/voucherController.js";
-import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -27,35 +27,35 @@ const adminVoucherLimiter = rateLimit({
 router.get(
   "/vouchers",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   getVouchers
 );
 router.post(
   "/vouchers",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   createVoucher
 );
 router.get(
   "/vouchers/search-users",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   searchUsersForVoucher
 );
 router.get(
   "/vouchers/search-products",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   searchProductsForVoucher
 );
 router.get(
   "/vouchers/search-categories",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   searchCategoriesForVoucher
 );
@@ -63,21 +63,21 @@ router.get("/vouchers/available", authenticateToken, getAvailableVouchersForUser
 router.get(
   "/vouchers/:id",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   getVoucherById
 );
 router.put(
   "/vouchers/:id",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   updateVoucher
 );
 router.delete(
   "/vouchers/:id",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   adminVoucherLimiter,
   deleteVoucher
 );

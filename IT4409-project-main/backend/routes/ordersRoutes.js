@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticateToken } from "../middleware/auth.js";
-import { authorizeRole } from "../middleware/auth.js";
+import { authorizeRoles } from "../middleware/auth.js";
 import * as orderController from "../controllers/orderController.js";
 
 const router = express.Router();
@@ -10,7 +10,7 @@ router.get("/orders/my", authenticateToken, orderController.getMyOrders);
 router.get(
   "/orders",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   orderController.getAllOrders
 );
 router.put(
@@ -21,7 +21,7 @@ router.put(
 router.get(
   "/orders/stats",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   orderController.getOrderStats
 );
 
@@ -29,13 +29,13 @@ router.get(
 router.put(
   "/orders/:id/confirm",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   orderController.confirmOrderByAdmin
 );
 router.put(
   "/orders/:id/admin-cancel",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRoles("admin"),
   orderController.cancelOrderByAdmin
 );
 
