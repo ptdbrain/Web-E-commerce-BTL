@@ -29,8 +29,10 @@ export function CartPopup() {
   const handleCheckout = () => {
     setIsCartOpen(false);
     setIsManualSelection(false);
-    setSelectedItemIds([]);
-    setDirectCheckoutItems([]);
+    
+    // Đã xóa 2 dòng setSelectedItemIds([]) và setDirectCheckoutItems([]) ở đây 
+    // để giữ lại dữ liệu giỏ hàng (Global State) truyền sang trang Thanh Toán
+    
     navigate("/checkout");
   };
 
