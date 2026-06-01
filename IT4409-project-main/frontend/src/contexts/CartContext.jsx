@@ -244,8 +244,15 @@ export function CartProvider({ children }) {
     const handleAuthChanged = () => {
       const nextToken = getStoredToken();
 
+      // TRƯỜNG HỢP 1: Từ Khách vãng lai -> Đăng nhập
       if (!authTokenRef.current && nextToken) {
         guestCartSnapshotRef.current = cartItemsRef.current;
+      } 
+      // TRƯỜNG HỢP 2: Từ Có tài khoản -> Đăng xuất (ĐÃ THÊM LOGIC DỌN RÁC Ở ĐÂY)
+      else if (authTokenRef.current && !nextToken) {
+        setCartItems([]);
+        setDirectCheckoutItems([]);
+        localStorage.removeItem("cartItems");
       }
 
       setAuthToken(nextToken);
