@@ -13,6 +13,11 @@ import { sendPasswordResetEmail } from "../config/email.js";
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
+const isStrongPassword = (password) => {
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+};
+
 async function verifyGoogleIdToken(idToken) {
   if (!googleClient || !googleClientId) {
     throw new Error("Google login is not configured on server");
@@ -157,6 +162,12 @@ export const register = async (req, res) => {
         .json({ message: "Vui lòng điền đầy đủ thông tin." });
     }
 
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ 
+        message: "Mật khẩu phải dài ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt." 
+      });
+    }
+
     if (password !== confirmPassword) {
       return res
         .status(400)
@@ -252,6 +263,12 @@ export const completeGoogleProfile = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Vui lòng điền đầy đủ thông tin." });
+    }
+
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({ 
+        message: "Mật khẩu phải dài ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt." 
+      });
     }
 
     if (password !== confirmPassword) {
@@ -425,6 +442,12 @@ export const resetPasswordWithCode = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Vui lòng nhập đầy đủ thông tin." });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({ 
+        message: "Mật khẩu mới phải dài ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt." 
+      });
     }
 
     if (newPassword !== confirmPassword) {
