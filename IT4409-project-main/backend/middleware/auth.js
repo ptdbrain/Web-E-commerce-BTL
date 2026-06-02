@@ -35,7 +35,7 @@ export const optionalAuth = (req, res, next) => {
 };
 
 
-export const authorizeRoless = (...allowedRoles) => {
+export const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !req.user.role) {
       return res.status(401).json({ success: false, message: 'Not authenticated or role missing' });
@@ -70,4 +70,4 @@ export const isSelfOrAuthorizedRoles = (...allowedRoles) => {
   };
 };
 
-export default { authenticateToken, optionalAuth, authorizeRoless, isSelfOrAuthorizedRoles };
+export default { authenticateToken, optionalAuth, authorizeRoles, isSelfOrAuthorizedRoles };
