@@ -107,7 +107,20 @@ const upsertDemoUser = async ({
 };
 
 const createDemoUsers = async () => {
-  const [admin, customer, customerTwo] = await Promise.all([
+  const reviewerSpecs = [
+    ["khachhang", "Nguyễn Minh Anh", "minhanh@firebite.local", "0900000002", "12 Nguyễn Trãi, Thanh Xuân, Hà Nội"],
+    ["linhpham", "Phạm Gia Linh", "linhpham@firebite.local", "0900000003", "88 Trần Duy Hưng, Cầu Giấy, Hà Nội"],
+    ["hoanganh", "Trần Hoàng Anh", "hoanganh@firebite.local", "0900000004", "24 Láng Hạ, Đống Đa, Hà Nội"],
+    ["thutrang", "Lê Thu Trang", "thutrang@firebite.local", "0900000005", "15 Nguyễn Văn Cừ, Long Biên, Hà Nội"],
+    ["quanghuy", "Đỗ Quang Huy", "quanghuy@firebite.local", "0900000006", "102 Tây Sơn, Đống Đa, Hà Nội"],
+    ["maiphuong", "Ngô Mai Phương", "maiphuong@firebite.local", "0900000007", "36 Phố Huế, Hai Bà Trưng, Hà Nội"],
+    ["ducminh", "Vũ Đức Minh", "ducminh@firebite.local", "0900000008", "71 Hồ Tùng Mậu, Nam Từ Liêm, Hà Nội"],
+    ["baongoc", "Bùi Bảo Ngọc", "baongoc@firebite.local", "0900000009", "19 Kim Mã, Ba Đình, Hà Nội"],
+    ["tuanviet", "Nguyễn Tuấn Việt", "tuanviet@firebite.local", "0900000010", "43 Đại Cồ Việt, Hai Bà Trưng, Hà Nội"],
+    ["hanhnguyen", "Đặng Khánh Hạnh", "hanhnguyen@firebite.local", "0900000011", "9 Trần Thái Tông, Cầu Giấy, Hà Nội"],
+  ];
+
+  const [admin, ...reviewers] = await Promise.all([
     upsertDemoUser({
       username: "admin",
       fullname: "FireBite Admin",
@@ -117,27 +130,26 @@ const createDemoUsers = async () => {
       phoneNumber: "0900000001",
       addresses: ["FireBite HQ, Ha Noi"],
     }),
-    upsertDemoUser({
-      username: "khachhang",
-      fullname: "Nguyen Minh Anh",
-      email: "minhanh@firebite.local",
-      password: "Customer@123",
-      role: "customer",
-      phoneNumber: "0900000002",
-      addresses: ["12 Nguyễn Trãi, Thanh Xuân, Hà Nội"],
-    }),
-    upsertDemoUser({
-      username: "linhpham",
-      fullname: "Phạm Gia Linh",
-      email: "linhpham@firebite.local",
-      password: "Customer@123",
-      role: "customer",
-      phoneNumber: "0900000003",
-      addresses: ["88 Trần Duy Hưng, Cầu Giấy, Hà Nội"],
-    }),
+    ...reviewerSpecs.map(
+      ([username, fullname, email, phoneNumber, address]) =>
+        upsertDemoUser({
+          username,
+          fullname,
+          email,
+          password: "Customer@123",
+          role: "customer",
+          phoneNumber,
+          addresses: [address],
+        })
+    ),
   ]);
 
-  return { admin, customer, customerTwo };
+  return {
+    admin,
+    customer: reviewers[0],
+    customerTwo: reviewers[1],
+    reviewers,
+  };
 };
 
 const toOrderItem = (product, quantity = 1) => {
@@ -274,25 +286,101 @@ const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDoc
   return orders;
 };
 
-const createDemoReviews = async ({ customer, customerTwo, productDocs }) => {
-  await Review.insertMany([
+const REVIEW_COUNT = 300;
+
+const REVIEW_COMMENTS = [
+  "Món nóng, đóng gói cẩn thận và giao khá nhanh.",
+  "Khẩu phần vừa đủ, gia vị hợp khẩu vị.",
+  "Đồ ăn ngon nhưng hôm nay giao hơi chậm.",
+  "Sốt đậm đà, lần sau mình sẽ gọi thêm.",
+  "Món ổn trong tầm giá, bao bì sạch sẽ.",
+  "Phần ăn nhiều hơn mình nghĩ, rất đáng tiền.",
+  "Hơi mặn với mình nhưng nguyên liệu vẫn tươi.",
+  "Khoai còn giòn, burger không bị nguội.",
+  "Combo tiện và đủ no cho bữa trưa.",
+  "Vị cay vừa phải, ăn khá cuốn.",
+  "Nước uống mát nhưng lượng đá hơi nhiều.",
+  "Món trình bày đẹp, giống hình trên ứng dụng.",
+  "Gà giòn bên ngoài, thịt bên trong không khô.",
+  "Không quá đặc biệt nhưng chất lượng ổn định.",
+  "Mình đặt lại lần hai và chất lượng vẫn tốt.",
+  "Phần sốt hơi ít, nên có thêm lựa chọn mua kèm.",
+  "Nhân viên chuẩn bị đúng ghi chú ít cay.",
+  "Giá hợp lý khi dùng cùng voucher.",
+  "Mùi vị thơm, trẻ nhỏ trong nhà cũng thích.",
+  "Đóng gói chắc chắn, không bị đổ khi nhận.",
+  "Món tạm ổn, mong cửa hàng cải thiện thời gian giao.",
+  "Ăn ngon nhất khi còn nóng, sẽ tiếp tục ủng hộ.",
+  "Kích thước phần ăn đúng mô tả.",
+  "Đồ ăn sạch, vị dễ ăn và không quá dầu.",
+];
+
+const REVIEW_RATINGS = [5, 4, 4, 5, 3, 4, 2, 5, 4, 3, 5, 1];
+
+const recalculateSeededProductRatings = async () => {
+  const aggregates = await Review.aggregate([
     {
-      user_id: customer._id,
-      product_id: productDocs[0]._id,
-      userName: customer.fullname,
-      rating: 5,
-      comment: "Burger nóng, sốt vừa miệng, giao nhanh.",
-      isVerified: true,
-    },
-    {
-      user_id: customerTwo._id,
-      product_id: productDocs[30]._id,
-      userName: customerTwo.fullname,
-      rating: 4,
-      comment: "Combo hợp lý cho hai người, cần thêm lựa chọn ít cay.",
-      isVerified: true,
+      $group: {
+        _id: "$product_id",
+        rating: { $avg: "$rating" },
+        numReviews: { $sum: 1 },
+      },
     },
   ]);
+
+  if (aggregates.length === 0) return;
+
+  await Product.bulkWrite(
+    aggregates.map((item) => ({
+      updateOne: {
+        filter: { _id: item._id },
+        update: {
+          $set: {
+            rating: Number(item.rating.toFixed(1)),
+            numReviews: item.numReviews,
+          },
+        },
+      },
+    }))
+  );
+};
+
+const createDemoReviews = async ({ reviewers, productDocs }) => {
+  const reviews = [];
+
+  for (let index = 0; index < REVIEW_COUNT; index += 1) {
+    const reviewerIndex = index % reviewers.length;
+    const productIndex =
+      (Math.floor(index / reviewers.length) + reviewerIndex * 7) %
+      productDocs.length;
+    const reviewer = reviewers[reviewerIndex];
+    const product = productDocs[productIndex];
+    const createdAt = new Date(
+      Date.UTC(2026, 5, 8, 12, 0, 0) -
+        ((index * 37) % 180) * 24 * 60 * 60 * 1000 -
+        (index % 24) * 60 * 60 * 1000
+    );
+
+    reviews.push({
+      user_id: reviewer._id,
+      product_id: product._id,
+      userName: reviewer.fullname,
+      userAvatar: reviewer.avatarPicture || "",
+      rating: REVIEW_RATINGS[(index * 5 + productIndex) % REVIEW_RATINGS.length],
+      comment:
+        REVIEW_COMMENTS[
+          (index * 11 + reviewerIndex + productIndex) % REVIEW_COMMENTS.length
+        ],
+      images: [],
+      isVerified: index % 4 !== 0,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  }
+
+  await Review.insertMany(reviews, { ordered: true });
+  await recalculateSeededProductRatings();
+  return reviews.length;
 };
 
 const createDemoChat = async ({ admin, customer, orders }) => {
@@ -329,14 +417,13 @@ const createDemoOperationalData = async ({ productDocs, voucherDocs }) => {
     productDocs,
     voucherDocs,
   });
-  await createDemoReviews({
-    customer: users.customer,
-    customerTwo: users.customerTwo,
+  const reviewCount = await createDemoReviews({
+    reviewers: users.reviewers,
     productDocs,
   });
   await createDemoChat({ admin: users.admin, customer: users.customer, orders });
 
-  return { users, orders };
+  return { users, orders, reviewCount };
 };
 
 const createCategories = async () => {
@@ -535,7 +622,7 @@ const main = async () => {
     await clearRedisProductCache();
 
     console.log(
-      `Seed completed: ${categoryMap.size} categories, ${productDocs.length} products, ${voucherDocs.length} vouchers, 3 users, ${demo.orders.length} orders`
+      `Seed completed: ${categoryMap.size} categories, ${productDocs.length} products, ${voucherDocs.length} vouchers, 11 users, ${demo.orders.length} orders, ${demo.reviewCount} reviews`
     );
   } finally {
     try {

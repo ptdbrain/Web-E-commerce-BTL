@@ -32,7 +32,11 @@ export const buildCartApiItemPayload = (item = {}) => ({
   itemNote: String(item.itemNote || item.note || "").trim(),
 });
 
-export const buildOrderItemPayload = (item = {}) => ({
+export const buildOrderItemPayload = (
+  item = {},
+  { includeCartKey = true } = {}
+) => ({
+  ...(includeCartKey && item.cartKey ? { cartKey: item.cartKey } : {}),
   productId: item.id || item.productId,
   productName: item.name || item.productName || "",
   productImage: item.imageUrl || item.image || item.thumbnail || "",

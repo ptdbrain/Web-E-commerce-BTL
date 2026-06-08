@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  consumePurchasedCartItems,
   upsertCartItem,
   updateCartItemQuantity,
 } from "../utils/cartDomain.js";
@@ -56,4 +57,65 @@ test("updateCartItemQuantity recalculates line total for the snapshot item", () 
       lineTotal: 327000,
     },
   ]);
+});
+
+test("consumePurchasedCartItems subtracts only the purchased quantity", () => {
+  const next = consumePurchasedCartItems(
+    [
+      {
+        cartKey: "burger::m::cheese::",
+        quantity: 4,
+        unitPrice: 69000,
+        lineTotal: 276000,
+      },
+      {
+        cartKey: "drink::l::::",
+        quantity: 1,
+        unitPrice: 25000,
+        lineTotal: 25000,
+      },
+    ],
+    [
+      {
+        cartKey: "burger::m::cheese::",
+        quantity: 2,
+      },
+    ]
+  );
+
+  assert.deepEqual(next, [
+    {
+      cartKey: "burger::m::cheese::",
+      quantity: 2,
+      unitPrice: 69000,
+      lineTotal: 138000,
+    },
+    {
+      cartKey: "drink::l::::",
+      quantity: 1,
+      unitPrice: 25000,
+      lineTotal: 25000,
+    },
+  ]);
+});
+
+test("consumePurchasedCartItems removes a line when all quantity was purchased", () => {
+  const next = consumePurchasedCartItems(
+    [
+      {
+        cartKey: "burger::m::cheese::",
+        quantity: 2,
+        unitPrice: 69000,
+        lineTotal: 138000,
+      },
+    ],
+    [
+      {
+        cartKey: "burger::m::cheese::",
+        quantity: 2,
+      },
+    ]
+  );
+
+  assert.deepEqual(next, []);
 });

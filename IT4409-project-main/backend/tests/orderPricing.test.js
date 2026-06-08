@@ -40,6 +40,7 @@ test("priceOrderItemsFromProducts ignores client supplied prices", () => {
     [
       {
         productId: "64f100000000000000000001",
+        cartKey: "burger::large::pho-mai::",
         productName: "Fake name",
         price: 1,
         unitPrice: 1,
@@ -53,6 +54,7 @@ test("priceOrderItemsFromProducts ignores client supplied prices", () => {
   );
 
   assert.equal(item.productName, "Burger Ga Gion");
+  assert.equal(item.cartKey, "burger::large::pho-mai::");
   assert.equal(item.basePrice, 69000);
   assert.equal(item.price, 69000);
   assert.equal(item.selectedSize.priceModifier, 12000);

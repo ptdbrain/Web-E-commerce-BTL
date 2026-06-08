@@ -22,6 +22,7 @@ import {
   isPaymentExpired,
   PAYMENT_EXPIRY_MINUTES,
 } from "../utils/orderWorkflow.js";
+import { consumeOrderCartItems } from "../services/orderCartSync.js";
 
 const getProductIdsFromItems = (items = []) =>
   [
@@ -285,7 +286,13 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    return res.status(201).json({ order, paymentData });
+    let syncedCart = null;
+    if (resolvedPaymentMethod !== EPaymentMethod.Zalopay) {
+      const syncResult = await consumeOrderCartItems(order);
+      syncedCart = syncResult.cart;
+    }
+
+    return res.status(201).json({ order, paymentData, cart: syncedCart });
   } catch (err) {
     const message = err?.message || "Server error";
     if (

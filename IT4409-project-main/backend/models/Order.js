@@ -57,6 +57,7 @@ const OrderSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
+        cartKey: { type: String },
         productName: { type: String },
         productImage: { type: String },
         quantity: { type: Number, required: true },
@@ -124,6 +125,7 @@ const OrderSchema = new mongoose.Schema(
     voucherUsageCounted: { type: Boolean, default: false },
     stockReserved: { type: Boolean, default: false },
     stockReleased: { type: Boolean, default: false },
+    cartItemsConsumed: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

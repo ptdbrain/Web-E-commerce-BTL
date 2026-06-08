@@ -118,6 +118,7 @@ export const priceOrderItemsFromProducts = (items = [], products = []) => {
 
     return {
       productId,
+      cartKey: String(item.cartKey || "").trim(),
       productName: product.name || item.productName || item.name || "",
       productImage: getProductImage(product),
       quantity,

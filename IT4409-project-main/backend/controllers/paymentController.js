@@ -4,6 +4,7 @@ import Order, { EOrderStatus, EPaymentStatus } from "../models/Order.js";
 import Product from "../models/Product.js";
 import Voucher from "../models/Voucher.js";
 import { queryZaloPayStatus, zaloPayConfig } from "../config/zalopay.js";
+import { consumeOrderCartItems } from "../services/orderCartSync.js";
 
 const markOrderPaid = async (order) => {
   if (!order) return null;
@@ -23,6 +24,7 @@ const markOrderPaid = async (order) => {
   }
 
   await order.save();
+  await consumeOrderCartItems(order);
   return order;
 };
 
@@ -109,6 +111,9 @@ export const checkZaloPayStatus = async (req, res) => {
     }
 
     if (order.orderStatus !== EOrderStatus.WaitingForPayment) {
+      if (order.paymentStatus === EPaymentStatus.Paid) {
+        await consumeOrderCartItems(order);
+      }
       return res.json({
         orderStatus: order.orderStatus,
         paymentStatus: order.paymentStatus,

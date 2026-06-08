@@ -191,43 +191,6 @@ export function CartProvider({ children }) {
     [authToken, applyServerCart]
   );
 
-  const removePurchasedCartItems = useCallback(
-    async (itemsToRemove = []) => {
-      const cartKeys = itemsToRemove
-        .map((item) => item.cartKey)
-        .filter(Boolean);
-
-      if (cartKeys.length === 0) return;
-
-      if (!authToken) {
-        setCartItems((prevItems) =>
-          prevItems.filter((item) => !cartKeys.includes(item.cartKey))
-        );
-        return;
-      }
-
-      let latestCart = null;
-
-      for (const cartKey of cartKeys) {
-        try {
-          latestCart = await removeCartItemRequest(authToken, cartKey);
-        } catch (error) {
-          console.error("Error removing purchased cart item:", error);
-        }
-      }
-
-      if (latestCart) {
-        applyServerCart(latestCart);
-        return;
-      }
-
-      setCartItems((prevItems) =>
-        prevItems.filter((item) => !cartKeys.includes(item.cartKey))
-      );
-    },
-    [authToken, applyServerCart]
-  );
-
   useEffect(() => {
     localStorage.setItem("cartItems", JSON.stringify(cartItems));
   }, [cartItems]);
@@ -356,6 +319,9 @@ export function CartProvider({ children }) {
           localStorage.removeItem("pendingZaloPayOrder");
           return;
         }
+
+        const syncedCart = await fetchCart(authToken);
+        applyServerCart(syncedCart);
       } catch (error) {
         console.error("[ZaloPay] Status check error:", error);
         return;
@@ -366,7 +332,7 @@ export function CartProvider({ children }) {
     }, remainingTime);
 
     return () => clearTimeout(timeoutId);
-  }, [authToken, pendingZaloPayOrder]);
+  }, [authToken, pendingZaloPayOrder, applyServerCart]);
 
   const addToCart = useCallback(
     async (product) => {
@@ -511,7 +477,11 @@ export function CartProvider({ children }) {
         paymentMethod,
         deliveryFee: pricing.deliveryFee,
         voucherCode: voucherCode || undefined,
-        items: selectedItems.map(buildOrderItemPayload),
+        items: selectedItems.map((item) =>
+          buildOrderItemPayload(item, {
+            includeCartKey: directCheckoutItems.length === 0,
+          })
+        ),
       };
 
       const response = await axios.post(buildApiUrl("/orders"), payload, {
@@ -539,10 +509,6 @@ export function CartProvider({ children }) {
             JSON.stringify(pendingOrder)
           );
 
-          if (directCheckoutItems.length === 0) {
-            await removePurchasedCartItems(selectedItems);
-          }
-
           setSelectedItemIds([]);
           setDirectCheckoutItems([]);
           setVoucherCode("");
@@ -562,8 +528,11 @@ export function CartProvider({ children }) {
 
       setOrderSuccess(true);
 
-      if (directCheckoutItems.length === 0) {
-        await removePurchasedCartItems(selectedItems);
+      if (response?.data?.cart) {
+        applyServerCart(response.data.cart);
+      } else if (directCheckoutItems.length === 0) {
+        const syncedCart = await fetchCart(authToken);
+        applyServerCart(syncedCart);
       }
 
       setSelectedItemIds([]);
