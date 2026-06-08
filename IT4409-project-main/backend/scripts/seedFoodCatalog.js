@@ -124,16 +124,16 @@ const createDemoUsers = async () => {
       password: "Customer@123",
       role: "customer",
       phoneNumber: "0900000002",
-      addresses: ["12 Nguyen Trai, Thanh Xuan, Ha Noi"],
+      addresses: ["12 Nguyễn Trãi, Thanh Xuân, Hà Nội"],
     }),
     upsertDemoUser({
       username: "linhpham",
-      fullname: "Pham Gia Linh",
+      fullname: "Phạm Gia Linh",
       email: "linhpham@firebite.local",
       password: "Customer@123",
       role: "customer",
       phoneNumber: "0900000003",
-      addresses: ["88 Tran Duy Hung, Cau Giay, Ha Noi"],
+      addresses: ["88 Trần Duy Hưng, Cầu Giấy, Hà Nội"],
     }),
   ]);
 
@@ -191,7 +191,7 @@ const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDoc
       fulfillmentType: EFulfillmentType.Delivery,
       products: [[productDocs[0], 1], [productDocs[3], 1]],
       deliveryFee: 30000,
-      note: "Khong cay, giao sau 18h.",
+      note: "Không cay, giao sau 18h.",
     },
     {
       customer: customerTwo,
@@ -201,7 +201,7 @@ const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDoc
       products: [[productDocs[8], 1], [productDocs[14], 2]],
       deliveryFee: 0,
       pickupTime: "18:30",
-      note: "Khach den lay tai quay.",
+      note: "Khách đến lấy tại quầy.",
     },
     {
       customer: customer,
@@ -211,7 +211,7 @@ const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDoc
       products: [[productDocs[20], 1], [productDocs[22], 1]],
       deliveryFee: 25000,
       voucher: firebiteVoucher,
-      note: "Da thanh toan ZaloPay demo.",
+      note: "Đã thanh toán ZaloPay demo.",
     },
     {
       customer: customerTwo,
@@ -223,9 +223,9 @@ const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDoc
       tableBooking: {
         guestCount: 2,
         bookingTime: "19:00",
-        contactNote: "Ban gan cua so neu con.",
+        contactNote: "Bàn gần cửa sổ nếu còn.",
       },
-      note: "Don demo da hoan tat.",
+      note: "Đơn demo đã hoàn tất.",
     },
   ];
 
@@ -281,7 +281,7 @@ const createDemoReviews = async ({ customer, customerTwo, productDocs }) => {
       product_id: productDocs[0]._id,
       userName: customer.fullname,
       rating: 5,
-      comment: "Burger nong, sot vua mieng, giao nhanh.",
+      comment: "Burger nóng, sốt vừa miệng, giao nhanh.",
       isVerified: true,
     },
     {
@@ -289,7 +289,7 @@ const createDemoReviews = async ({ customer, customerTwo, productDocs }) => {
       product_id: productDocs[30]._id,
       userName: customerTwo.fullname,
       rating: 4,
-      comment: "Combo hop ly cho hai nguoi, can them lua chon it cay.",
+      comment: "Combo hợp lý cho hai người, cần thêm lựa chọn ít cay.",
       isVerified: true,
     },
   ]);
@@ -307,14 +307,14 @@ const createDemoChat = async ({ admin, customer, orders }) => {
       user: customer._id,
       order: orders[0]._id,
       role: "user",
-      content: "Don nay co the giao sau 18h khong?",
+      content: "Đơn này có thể giao sau 18h không?",
       isReadByAdmin: true,
     },
     {
       user: customer._id,
       order: orders[0]._id,
       role: "assistant",
-      content: "Duoc, FireBite se ghi chu giao sau 18h cho don cua ban.",
+      content: "Được, FireBite sẽ ghi chú giao sau 18h cho đơn của bạn.",
       isReadByAdmin: true,
     },
   ]);
@@ -413,7 +413,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
   return [
     {
       code: "FIREBITE15",
-      description: "Giam 15% toi da 40.000d cho don tu 149.000d.",
+      description: "Giảm 15% tối đa 40.000đ cho đơn từ 149.000đ.",
       discountType: EVoucherDiscountType.Percent,
       discountValue: 15,
       maxDiscountAmount: 40000,
@@ -431,7 +431,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "LUNCH30K",
-      description: "Giam 30.000d cho cac mon lunch-deals tu 119.000d.",
+      description: "Giảm 30.000đ cho các món lunch-deals từ 119.000đ.",
       discountType: EVoucherDiscountType.Amount,
       discountValue: 30000,
       maxDiscountAmount: 0,
@@ -449,7 +449,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "FREESHIP99",
-      description: "Mien phi giao hang cho don delivery tu 99.000d.",
+      description: "Miễn phí giao hàng cho đơn delivery từ 99.000đ.",
       discountType: EVoucherDiscountType.FreeShipping,
       discountValue: 0,
       maxDiscountAmount: 0,
@@ -467,7 +467,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "SWEET10",
-      description: "Giam 10% toi da 25.000d cho desserts va drinks.",
+      description: "Giảm 10% tối đa 25.000đ cho desserts và drinks.",
       discountType: EVoucherDiscountType.Percent,
       discountValue: 10,
       maxDiscountAmount: 25000,
@@ -485,7 +485,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "COMBO25",
-      description: "Giam 25.000d cho cac combo FireBite tu 179.000d.",
+      description: "Giảm 25.000đ cho các combo FireBite từ 179.000đ.",
       discountType: EVoucherDiscountType.Amount,
       discountValue: 25000,
       maxDiscountAmount: 0,

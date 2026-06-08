@@ -70,7 +70,7 @@ export function OrderSummary({ cartItems, voucherResult, fulfillmentType }) {
 
         <div className="flex justify-between text-sm text-slate-500">
           <span>
-            {fulfillmentType === "delivery" ? "Phi giao hang" : "Phi phuc vu"}
+            {fulfillmentType === "delivery" ? "Phí giao hàng" : "Phí phục vụ"}
           </span>
           <span>
             {totals.deliveryFee > 0 ? formatPrice(totals.deliveryFee) : "Mien phi"}

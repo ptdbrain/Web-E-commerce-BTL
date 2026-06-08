@@ -9,16 +9,7 @@ const TechNews = () => {
 
   const filteredArticles = useMemo(() => {
     if (activeTab === "Tất cả") return homeArticles;
-    // Map Vietnamese tab names to category values in data
-    const tabMap = {
-      "Ưu đãi": "Uu dai",
-      "Món mới": "Mon moi",
-      "Mẹo order": "Meo order",
-      "Vận hành": "Van hanh",
-    };
-    return homeArticles.filter(
-      (article) => article.category === (tabMap[activeTab] || activeTab)
-    );
+    return homeArticles.filter((article) => article.category === activeTab);
   }, [activeTab]);
 
   const featuredArticle = filteredArticles[0];

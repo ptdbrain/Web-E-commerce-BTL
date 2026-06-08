@@ -30,10 +30,10 @@ export const getAdminOrderAdvance = (status, fulfillmentType = "delivery") => {
 export const getAdminOrderActionLabel = (status, fulfillmentType = "delivery") => {
   const nextStatus = getAdminOrderAdvance(status, fulfillmentType);
 
-  if (nextStatus === "preparing") return "Nhan don";
-  if (nextStatus === "ready") return "San sang giao mon";
-  if (nextStatus === "shipping") return "Chuyen giao hang";
-  if (nextStatus === "confirmed") return "Hoan tat don";
+  if (nextStatus === "preparing") return "Nhận đơn";
+  if (nextStatus === "ready") return "Sẵn sàng giao món";
+  if (nextStatus === "shipping") return "Chuyển giao hàng";
+  if (nextStatus === "confirmed") return "Hoàn tất đơn";
 
   return "";
 };

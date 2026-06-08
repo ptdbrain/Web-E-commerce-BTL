@@ -2,11 +2,11 @@ import React from "react";
 
 const PriceRangeFilter = ({ selectedPriceRange, onPriceRangeChange }) => {
   const priceRanges = [
-    { label: "Tat ca", min: 0, max: Infinity },
-    { label: "Duoi 50.000d", min: 0, max: 50000 },
-    { label: "50.000d - 100.000d", min: 50000, max: 100000 },
-    { label: "100.000d - 200.000d", min: 100000, max: 200000 },
-    { label: "Tren 200.000d", min: 200000, max: Infinity },
+    { label: "Tất cả", min: 0, max: Infinity },
+    { label: "Dưới 50.000đ", min: 0, max: 50000 },
+    { label: "50.000đ - 100.000đ", min: 50000, max: 100000 },
+    { label: "100.000đ - 200.000đ", min: 100000, max: 200000 },
+    { label: "Trên 200.000đ", min: 200000, max: Infinity },
   ];
 
   const handleRangeSelect = (range) => {

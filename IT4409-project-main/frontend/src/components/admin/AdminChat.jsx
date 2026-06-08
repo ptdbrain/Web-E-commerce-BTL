@@ -184,7 +184,7 @@ export default function AdminChat() {
             <input
               type="text"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-              placeholder="Tim theo ten / email..."
+              placeholder="Tìm theo tên / email..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -241,7 +241,7 @@ export default function AdminChat() {
                       }
                     >
                       Đang được hỗ trợ bởi: {conversation.currentAdminName}
-                      {conversation.isHandledByMe && " (ban)"}
+                      {conversation.isHandledByMe && " (bạn)"}
                     </div>
                   ) : conversation.lastAdminName ? (
                     <div>Admin gan nhat: {conversation.lastAdminName}</div>
@@ -278,7 +278,7 @@ export default function AdminChat() {
                   {selectedUserInfo.currentAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
                       Đang được hỗ trợ bởi: {selectedUserInfo.currentAdminName}
-                      {selectedUserInfo.isHandledByMe && " (ban)"}
+                      {selectedUserInfo.isHandledByMe && " (bạn)"}
                     </div>
                   ) : selectedUserInfo.lastAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
