@@ -40,7 +40,7 @@ test("validateVoucherPayload rejects invalid percent and date range", () => {
       discountType: "percent",
       discountValue: 150,
     }).message,
-    "Phan tram giam gia phai lon hon 0 va khong vuot qua 100."
+    "Phần trăm giảm giá phải lớn hơn 0 và không vượt quá 100."
   );
 
   assert.equal(
@@ -51,6 +51,6 @@ test("validateVoucherPayload rejects invalid percent and date range", () => {
       startDate: new Date("2026-06-01"),
       endDate: new Date("2026-05-01"),
     }).message,
-    "Ngay bat dau khong duoc sau ngay ket thuc."
+    "Ngày bắt đầu không được sau ngày kết thúc."
   );
 });

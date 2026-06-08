@@ -13,9 +13,7 @@ export function CartPopup() {
     addToCart,
     decreaseQuantity,
     removeFromCart,
-    setSelectedItemIds,
     setIsManualSelection,
-    setDirectCheckoutItems,
   } = useCart();
 
   if (!isCartOpen) return null;

@@ -99,5 +99,5 @@ test("calculateVoucherPricing rejects free shipping for pickup", () => {
     nowDate: new Date("2026-04-23T10:00:00.000Z"),
   });
 
-  assert.match(result.errorMessage, /giao hang|delivery/i);
+  assert.match(result.errorMessage, /giao hàng|delivery/i);
 });
