@@ -25,8 +25,8 @@ import {
 const getFulfillmentDetail = (order) => {
   if (order.fulfillmentType === "pickup") {
     return order.pickupTime
-      ? `Gio lay mon: ${formatDateTime(order.pickupTime)}`
-      : "Khach tu den lay";
+      ? `Giờ lấy món: ${formatDateTime(order.pickupTime)}`
+      : "Khách tự đến lấy";
   }
 
   if (order.fulfillmentType === "dine_in") {

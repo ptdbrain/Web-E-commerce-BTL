@@ -47,7 +47,7 @@ export default function ChatWidget() {
       setIsOpen(true);
 
       if (order?.orderCode) {
-        setInput((prev) => prev || `Minh can ho tro ve don #${order.orderCode}: `);
+        setInput((prev) => prev || `Mình cần hỗ trợ về đơn #${order.orderCode}: `);
       }
     };
 

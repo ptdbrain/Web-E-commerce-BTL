@@ -474,7 +474,7 @@ export default function AdminVouchers() {
           {[
             { label: "Đang hoạt động", value: stats.active },
             { label: "Sắp hết hạn", value: stats.expiringSoon },
-            { label: "Voucher target", value: stats.targeted },
+            { label: "Voucher chỉ định", value: stats.targeted },
             { label: "Tổng lượt sử dụng", value: stats.totalUses },
           ].map((card) => (
             <div
@@ -499,7 +499,7 @@ export default function AdminVouchers() {
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tim theo ma hoac mo ta voucher..."
+              placeholder="Tìm theo mã hoặc mô tả voucher..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
             />
           </label>
@@ -591,7 +591,7 @@ export default function AdminVouchers() {
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {voucher.usedCount || 0}
-                    {voucher.maxUsage ? ` / ${voucher.maxUsage}` : " lan"}
+                    {voucher.maxUsage ? ` / ${voucher.maxUsage}` : " lần"}
                   </div>
                 </div>
 
@@ -637,7 +637,7 @@ export default function AdminVouchers() {
                   {actingVoucherId === voucher._id ? (
                     <LoaderCircle size={16} className="animate-spin" />
                   ) : null}
-                  {voucher.isActive ? "Tam tat voucher" : "Kich hoat voucher"}
+                  {voucher.isActive ? "Tạm tắt voucher" : "Kích hoạt voucher"}
                 </button>
 
                 <button
@@ -711,7 +711,7 @@ export default function AdminVouchers() {
                           value={form.description}
                           onChange={handleFormChange}
                           className={inputClass}
-                          placeholder="Giam 20% cho combo bua trua"
+                          placeholder="Giảm 20% cho combo bữa trưa"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -953,7 +953,7 @@ export default function AdminVouchers() {
                 type="text"
                 value={userSearch}
                 onChange={(event) => setUserSearch(event.target.value)}
-                placeholder="Tim theo ten, username hoac email"
+                placeholder="Tìm theo tên, username hoặc email"
                 className={inputClass}
               />
 
@@ -1003,7 +1003,7 @@ export default function AdminVouchers() {
                 type="text"
                 value={productSearch}
                 onChange={(event) => setProductSearch(event.target.value)}
-                placeholder="Tim theo ten mon..."
+                placeholder="Tìm theo tên món..."
                 className={inputClass}
               />
 
@@ -1053,7 +1053,7 @@ export default function AdminVouchers() {
                 type="text"
                 value={categorySearch}
                 onChange={(event) => setCategorySearch(event.target.value)}
-                placeholder="Tim theo ten danh muc..."
+                placeholder="Tìm theo tên danh mục..."
                 className={inputClass}
               />
 

@@ -34,9 +34,9 @@ test("getAdminOrderAdvance blocks terminal and unpaid orders", () => {
 });
 
 test("getAdminOrderActionLabel describes the next admin action", () => {
-  assert.equal(getAdminOrderActionLabel("pending", "delivery"), "Nhan don");
-  assert.equal(getAdminOrderActionLabel("preparing", "pickup"), "San sang giao mon");
-  assert.equal(getAdminOrderActionLabel("shipping", "delivery"), "Hoan tat don");
+  assert.equal(getAdminOrderActionLabel("pending", "delivery"), "Nhận đơn");
+  assert.equal(getAdminOrderActionLabel("preparing", "pickup"), "Sẵn sàng giao món");
+  assert.equal(getAdminOrderActionLabel("shipping", "delivery"), "Hoàn tất đơn");
 });
 
 test("buildProductVisibilityFilter hides inactive and unavailable items publicly", () => {

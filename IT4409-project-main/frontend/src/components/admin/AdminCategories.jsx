@@ -240,7 +240,7 @@ export default function AdminCategories() {
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tim theo ten, slug hoac danh muc con..."
+              placeholder="Tìm theo tên, slug hoặc danh mục con..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
             />
           </label>

@@ -240,7 +240,7 @@ export const AdminOrders = () => {
             { label: "Tổng đơn", value: stats.total },
             { label: "Đang xử lý", value: stats.processing },
             { label: "Delivery", value: stats.delivery },
-            { label: "Dat ban", value: stats.dineIn },
+            { label: "Đặt bàn", value: stats.dineIn },
           ].map((card) => (
             <div
               key={card.label}
@@ -267,7 +267,7 @@ export const AdminOrders = () => {
                 onChange={(event) =>
                   setFilters((prev) => ({ ...prev, query: event.target.value }))
                 }
-                placeholder="Tim theo ma don, ten khach, sdt..."
+                placeholder="Tìm theo mã đơn, tên khách, sđt..."
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
               />
             </label>

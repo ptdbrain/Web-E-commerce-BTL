@@ -96,11 +96,11 @@ export const normalizeVoucherPayload = (payload = {}, { partial = false } = {}) 
 
 export const validateVoucherPayload = (payload = {}, { partial = false } = {}) => {
   if (!partial && !payload.code) {
-    return { message: "Thieu ma voucher hoac loai giam gia." };
+    return { message: "Thiếu mã voucher hoặc loại giảm giá." };
   }
 
   if (!partial && !payload.discountType) {
-    return { message: "Thieu ma voucher hoac loai giam gia." };
+    return { message: "Thiếu mã voucher hoặc loại giảm giá." };
   }
 
   if (

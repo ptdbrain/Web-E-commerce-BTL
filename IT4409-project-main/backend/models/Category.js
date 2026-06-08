@@ -83,7 +83,7 @@ export const DEFAULT_CATEGORIES = [
     icon: "https://img.icons8.com/color/96/dinner.png",
   },
   {
-    name: "Deal bua trua",
+    name: "Deal bữa trưa",
     slug: "lunch-deals",
     icon: "https://img.icons8.com/color/96/lunchbox.png",
   },
