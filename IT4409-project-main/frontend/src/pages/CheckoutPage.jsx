@@ -18,6 +18,10 @@ import { storeConfig } from "../data/menuData.js";
 import { useCart } from "../hooks/useCart";
 import { buildVoucherItemPayload } from "../utils/cartPayload.js";
 import { calculateCheckoutTotals } from "../utils/checkoutPricing.js";
+import {
+  getCheckoutContactFromUser,
+  isCheckoutContactComplete,
+} from "../utils/checkoutContact.js";
 
 const formatVoucherValue = (voucher = {}) => {
   if (voucher.discountType === "free_shipping") {
@@ -53,6 +57,10 @@ export default function CheckoutPage() {
   const [applying, setApplying] = useState(false);
   const [availableVouchers, setAvailableVouchers] = useState([]);
   const [showVoucherList, setShowVoucherList] = useState(false);
+  const [contactMode, setContactMode] = useState("account");
+  const [accountContact, setAccountContact] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
 
   const selectedItems = useMemo(
     () =>
@@ -98,6 +106,71 @@ export default function CheckoutPage() {
         setAvailableVouchers([]);
       });
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setProfileLoading(false);
+      setContactMode("custom");
+      return;
+    }
+
+    let cancelled = false;
+
+    axios
+      .get(buildApiUrl("/user/me"), {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        if (cancelled) return;
+        const contact = getCheckoutContactFromUser(response.data?.user);
+        setAccountContact(contact);
+        setFormData((previous) => ({ ...previous, ...contact }));
+
+        if (!isCheckoutContactComplete(contact, "delivery")) {
+          setContactMode("custom");
+          setProfileError(
+            "Hồ sơ chưa đủ thông tin nhận món. Vui lòng bổ sung cho đơn hàng này."
+          );
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setContactMode("custom");
+        setProfileError(
+          "Không tải được thông tin tài khoản. Bạn vẫn có thể nhập thông tin nhận món."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setFormData]);
+
+  useEffect(() => {
+    if (
+      contactMode === "account" &&
+      accountContact &&
+      !isCheckoutContactComplete(accountContact, formData.fulfillmentType)
+    ) {
+      setContactMode("custom");
+      setProfileError(
+        "Hồ sơ chưa có địa chỉ giao hàng. Vui lòng nhập địa chỉ cho đơn này."
+      );
+    }
+  }, [accountContact, contactMode, formData.fulfillmentType]);
+
+  const handleContactModeChange = (mode) => {
+    setContactMode(mode);
+    setProfileError("");
+
+    if (mode === "account" && accountContact) {
+      setFormData((previous) => ({ ...previous, ...accountContact }));
+    }
+  };
 
   useEffect(() => {
     setVoucherError("");
@@ -207,7 +280,15 @@ export default function CheckoutPage() {
           <form onSubmit={handlePlaceOrder}>
             <div className="grid items-start gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-6">
-                <CheckoutForm formData={formData} setFormData={setFormData} />
+                <CheckoutForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  contactMode={contactMode}
+                  onContactModeChange={handleContactModeChange}
+                  accountContact={accountContact}
+                  profileLoading={profileLoading}
+                  profileError={profileError}
+                />
               </div>
 
               <div className="space-y-5">

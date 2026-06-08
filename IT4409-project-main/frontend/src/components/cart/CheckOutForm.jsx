@@ -1,5 +1,11 @@
 import React from "react";
-import { FiTruck, FiMapPin, FiUsers } from "react-icons/fi";
+import {
+  FiCheck,
+  FiMapPin,
+  FiTruck,
+  FiUser,
+  FiUsers,
+} from "react-icons/fi";
 
 const fulfillmentOptions = [
   { value: "delivery", label: "Giao hàng", icon: FiTruck },
@@ -7,13 +13,36 @@ const fulfillmentOptions = [
   { value: "dine_in", label: "Đặt bàn tại quán", icon: FiUsers },
 ];
 
-export function CheckoutForm({ formData, setFormData }) {
+const contactOptions = [
+  {
+    value: "account",
+    label: "Thông tin tài khoản",
+    description: "Dùng thông tin đã lưu",
+    icon: FiUser,
+  },
+  {
+    value: "custom",
+    label: "Đặt hộ / địa chỉ khác",
+    description: "Chỉ áp dụng cho đơn này",
+    icon: FiMapPin,
+  },
+];
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]";
+
+export function CheckoutForm({
+  formData,
+  setFormData,
+  contactMode,
+  onContactModeChange,
+  accountContact,
+  profileLoading,
+  profileError,
+}) {
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((previous) => ({ ...previous, [name]: value }));
   };
 
   return (
@@ -23,7 +52,6 @@ export function CheckoutForm({ formData, setFormData }) {
       </h3>
 
       <div className="mt-6 space-y-5">
-        {/* Fulfillment type */}
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600">
             Hình thức nhận món
@@ -31,13 +59,13 @@ export function CheckoutForm({ formData, setFormData }) {
           <div className="grid gap-2 sm:grid-cols-3">
             {fulfillmentOptions.map((option) => {
               const Icon = option.icon;
-              const isActive = formData.fulfillmentType === option.value;
+              const active = formData.fulfillmentType === option.value;
               return (
                 <label
                   key={option.value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition-all duration-200 ${
-                    isActive
-                      ? "border-orange-500 bg-orange-50 shadow-sm shadow-orange-500/10"
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
+                    active
+                      ? "border-orange-500 bg-orange-50"
                       : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                   }`}
                 >
@@ -45,24 +73,20 @@ export function CheckoutForm({ formData, setFormData }) {
                     type="radio"
                     name="fulfillmentType"
                     value={option.value}
-                    checked={isActive}
+                    checked={active}
                     onChange={handleChange}
                     className="sr-only"
                   />
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      isActive
-                        ? "bg-gradient-to-br from-orange-500 to-rose-500 text-white"
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      active
+                        ? "bg-orange-500 text-white"
                         : "bg-slate-100 text-slate-400"
                     }`}
                   >
                     <Icon size={16} />
-                  </div>
-                  <span
-                    className={`text-sm font-semibold ${
-                      isActive ? "text-orange-700" : "text-slate-600"
-                    }`}
-                  >
+                  </span>
+                  <span className="text-sm font-semibold text-slate-700">
                     {option.label}
                   </span>
                 </label>
@@ -71,118 +95,205 @@ export function CheckoutForm({ formData, setFormData }) {
           </div>
         </div>
 
-        {/* Name + Phone */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-600">
-              Họ và tên
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Nguyễn Văn A"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-              required
-            />
+        <div>
+          <div className="mb-2 text-sm font-medium text-slate-600">
+            Thông tin người nhận
           </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-600">
-              Số điện thoại
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="09xxxxxxxx"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-              required
-            />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {contactOptions.map((option) => {
+              const Icon = option.icon;
+              const active = contactMode === option.value;
+              const disabled = option.value === "account" && !accountContact;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={disabled || profileLoading}
+                  onClick={() => onContactModeChange(option.value)}
+                  className={`flex min-h-[74px] items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors ${
+                    active
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      active
+                        ? "bg-orange-500 text-white"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    <Icon size={15} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                      {option.label}
+                      {active && <FiCheck size={14} className="text-orange-600" />}
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      {option.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Delivery address */}
-        {formData.fulfillmentType === "delivery" && (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-600">
-              Địa chỉ giao hàng
-            </label>
-            <textarea
-              name="address"
-              rows="3"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="Số nhà, đường, tòa nhà..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] resize-none"
-              required
-            />
+        {profileLoading && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+            Đang tải thông tin tài khoản...
           </div>
         )}
 
-        {/* Pickup time */}
+        {profileError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {profileError}
+          </div>
+        )}
+
+        {!profileLoading && contactMode === "account" && accountContact && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+              <FiCheck size={16} />
+              Sử dụng thông tin đã lưu
+            </div>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-slate-500">Người nhận</dt>
+                <dd className="mt-1 break-words font-medium text-slate-800">
+                  {accountContact.name}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Số điện thoại</dt>
+                <dd className="mt-1 font-medium text-slate-800">
+                  {accountContact.phone}
+                </dd>
+              </div>
+              {formData.fulfillmentType === "delivery" && (
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500">Địa chỉ giao hàng</dt>
+                  <dd className="mt-1 break-words font-medium text-slate-800">
+                    {accountContact.address}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        )}
+
+        {!profileLoading && contactMode === "custom" && (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Họ và tên người nhận
+                </span>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="Nguyễn Văn A"
+                  className={inputClass}
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Số điện thoại người nhận
+                </span>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="09xxxxxxxx"
+                  className={inputClass}
+                  required
+                />
+              </label>
+            </div>
+            {formData.fulfillmentType === "delivery" && (
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">
+                  Địa chỉ giao hàng
+                </span>
+                <textarea
+                  name="address"
+                  rows="3"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Số nhà, đường, tòa nhà..."
+                  className={`${inputClass} resize-none`}
+                  required
+                />
+              </label>
+            )}
+          </div>
+        )}
+
         {formData.fulfillmentType === "pickup" && (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-600">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-600">
               Giờ đến lấy món
-            </label>
+            </span>
             <input
               type="datetime-local"
               name="pickupTime"
               value={formData.pickupTime}
               onChange={handleChange}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+              className={inputClass}
               required
             />
-          </div>
+          </label>
         )}
 
-        {/* Dine-in */}
         {formData.fulfillmentType === "dine_in" && (
           <>
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">
                   Giờ đặt bàn
-                </label>
+                </span>
                 <input
                   type="datetime-local"
                   name="bookingTime"
                   value={formData.bookingTime}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                  className={inputClass}
                   required
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">
                   Số khách
-                </label>
+                </span>
                 <input
                   type="number"
                   min="1"
                   name="guestCount"
                   value={formData.guestCount}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
+                  className={inputClass}
                   required
                 />
-              </div>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-600">
-                Ghi chú đặt bàn
               </label>
+            </div>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">
+                Ghi chú đặt bàn
+              </span>
               <textarea
                 name="contactNote"
                 rows="3"
                 value={formData.contactNote}
                 onChange={handleChange}
                 placeholder="Sinh nhật, vị trí ngồi, trẻ em đi cùng..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] resize-none"
+                className={`${inputClass} resize-none`}
               />
-            </div>
+            </label>
           </>
         )}
       </div>
