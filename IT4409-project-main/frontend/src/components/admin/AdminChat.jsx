@@ -163,7 +163,7 @@ export default function AdminChat() {
           <div className="space-y-3 border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_70%)] p-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Ho tro khach hang
+                Hỗ trợ khách hàng
               </div>
               <h2 className="mt-1 font-display text-2xl font-black text-slate-950">
                 Live chat
@@ -171,7 +171,7 @@ export default function AdminChat() {
             </div>
 
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Khach hang</h3>
+              <h3 className="font-semibold text-slate-900">Khách hàng</h3>
               <button
                 type="button"
                 onClick={loadConversations}
@@ -311,7 +311,7 @@ export default function AdminChat() {
               </>
             ) : (
               <div className="text-sm text-slate-400">
-                Chon mot khach hang de xem hoi thoai.
+                Chọn một khách hàng để xem hội thoại.
               </div>
             )}
           </div>
@@ -357,8 +357,8 @@ export default function AdminChat() {
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
                 placeholder={
                   selectedUserId
-                    ? "Nhap noi dung tra loi..."
-                    : "Chon mot khach hang de bat dau chat"
+                    ? "Nhập nội dung trả lời..."
+                    : "Chọn một khách hàng để bắt đầu chat"
                 }
                 value={input}
                 onChange={(event) => setInput(event.target.value)}

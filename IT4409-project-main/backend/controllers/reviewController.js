@@ -20,7 +20,7 @@ export const getReviewsByProduct = async (req, res) => {
     const skip = (page - 1) * limit;
 
     if (!mongoose.isValidObjectId(productId)) {
-      return res.status(400).json({ message: "productId khong hop le" });
+      return res.status(400).json({ message: "productId không hợp lệ" });
     }
 
     const pid = new mongoose.Types.ObjectId(productId);
@@ -90,11 +90,11 @@ export const createReview = async (req, res) => {
     const { productId } = req.params;
 
     if (!mongoose.isValidObjectId(productId)) {
-      return res.status(400).json({ message: "productId khong hop le" });
+      return res.status(400).json({ message: "productId không hợp lệ" });
     }
 
     if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "So sao khong hop le (1-5)" });
+      return res.status(400).json({ message: "Số sao không hợp lệ (1-5)" });
     }
 
     const existed = await Review.findOne({
@@ -102,7 +102,7 @@ export const createReview = async (req, res) => {
       user_id: req.user.id,
     });
     if (existed) {
-      return res.status(400).json({ message: "Ban da danh gia san pham nay roi" });
+      return res.status(400).json({ message: "Bạn đã đánh giá sản phẩm này rồi" });
     }
 
     const [user, purchasedOrder] = await Promise.all([
@@ -117,7 +117,7 @@ export const createReview = async (req, res) => {
     const reviewData = {
       product_id: productId,
       user_id: req.user.id,
-      userName: user?.fullname || user?.username || "Nguoi dung",
+      userName: user?.fullname || user?.username || "Người dùng",
       userAvatar: user?.avatarPicture || null,
       rating: Number(rating),
       comment,
@@ -127,7 +127,7 @@ export const createReview = async (req, res) => {
     await Review.create(reviewData);
     await recalculateProductRating(productId);
 
-    return res.status(201).json({ message: "Danh gia thanh cong" });
+    return res.status(201).json({ message: "Đánh giá thành công" });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }

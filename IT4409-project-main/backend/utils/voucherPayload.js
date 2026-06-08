@@ -107,31 +107,31 @@ export const validateVoucherPayload = (payload = {}, { partial = false } = {}) =
     payload.discountType &&
     !Object.values(EVoucherDiscountType).includes(payload.discountType)
   ) {
-    return { message: "Loai giam gia khong hop le." };
+    return { message: "Loại giảm giá không hợp lệ." };
   }
 
   if (
     payload.startDate === "invalid" ||
     payload.endDate === "invalid"
   ) {
-    return { message: "Ngay hieu luc voucher khong hop le." };
+    return { message: "Ngày hiệu lực voucher không hợp lệ." };
   }
 
   if (payload.startDate && payload.endDate && payload.startDate > payload.endDate) {
-    return { message: "Ngay bat dau khong duoc sau ngay ket thuc." };
+    return { message: "Ngày bắt đầu không được sau ngày kết thúc." };
   }
 
   if (payload.discountType === EVoucherDiscountType.Percent) {
     if (payload.discountValue <= 0 || payload.discountValue > 100) {
       return {
-        message: "Phan tram giam gia phai lon hon 0 va khong vuot qua 100.",
+        message: "Phần trăm giảm giá phải lớn hơn 0 và không vượt quá 100.",
       };
     }
   }
 
   if (payload.discountType === EVoucherDiscountType.Amount) {
     if (payload.discountValue <= 0) {
-      return { message: "Gia tri giam gia phai lon hon 0." };
+      return { message: "Giá trị giảm giá phải lớn hơn 0." };
     }
   }
 

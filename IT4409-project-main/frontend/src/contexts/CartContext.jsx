@@ -449,17 +449,17 @@ export function CartProvider({ children }) {
         : cartItems.filter((item) => selectedItemIds.includes(item.cartKey));
 
     if (!formData.name || !formData.phone || selectedItems.length === 0) {
-      alert("Vui long dien thong tin va chon it nhat mot mon.");
+      alert("Vui lòng điền thông tin và chọn ít nhất một món.");
       return;
     }
 
     if (formData.fulfillmentType === "delivery" && !formData.address) {
-      alert("Vui long nhap dia chi giao hang.");
+      alert("Vui lòng nhập địa chỉ giao hàng.");
       return;
     }
 
     if (formData.fulfillmentType === "pickup" && !formData.pickupTime) {
-      alert("Vui long chon gio den lay mon.");
+      alert("Vui lòng chọn giờ đến lấy món.");
       return;
     }
 
@@ -467,12 +467,12 @@ export function CartProvider({ children }) {
       formData.fulfillmentType === "dine_in" &&
       (!formData.bookingTime || !formData.guestCount)
     ) {
-      alert("Vui long nhap gio dat ban va so khach.");
+      alert("Vui lòng nhập giờ đặt bàn và số khách.");
       return;
     }
 
     if (!authToken) {
-      alert("Ban can dang nhap de dat mon.");
+      alert("Bạn cần đăng nhập để đặt món.");
       return;
     }
 
@@ -545,7 +545,7 @@ export function CartProvider({ children }) {
           return;
         }
 
-        alert("Khong tim thay link thanh toan ZaloPay.");
+        alert("Không tìm thấy link thanh toán ZaloPay.");
         return;
       }
 
@@ -571,7 +571,7 @@ export function CartProvider({ children }) {
         setOrderSuccess(false);
       }, 4000);
     } catch (error) {
-      alert(error?.response?.data?.message || "Dat mon that bai");
+      alert(error?.response?.data?.message || "Đặt món thất bại");
     }
   };
 

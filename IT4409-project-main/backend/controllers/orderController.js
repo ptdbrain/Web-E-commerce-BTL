@@ -361,7 +361,7 @@ export const getOrderStats = async (req, res) => {
     let endDate = to ? new Date(to) : new Date();
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ message: "Tham so thoi gian khong hop le." });
+      return res.status(400).json({ message: "Tham số thời gian không hợp lệ." });
     }
 
     if (startDate < minStart) startDate = minStart;
@@ -442,7 +442,7 @@ export const getOrderStats = async (req, res) => {
     console.error("getOrderStats error", err);
     return res
       .status(500)
-      .json({ message: "Loi server khi lay thong ke don hang." });
+      .json({ message: "Lỗi server khi lấy thống kê đơn hàng." });
   }
 };
 
@@ -586,7 +586,7 @@ export const receiveOrder = async (req, res) => {
     if (!canCompleteOrder(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
-        .json({ message: "Chi co the hoan tat khi don dang duoc xu ly" });
+        .json({ message: "Chỉ có thể hoàn tất khi đơn đang được xử lý" });
     }
 
     order.orderStatus = EOrderStatus.Confirmed;
@@ -595,7 +595,7 @@ export const receiveOrder = async (req, res) => {
     }
     await order.save();
 
-    return res.json({ order, message: "Da xac nhan hoan tat don hang" });
+    return res.json({ order, message: "Đã xác nhận hoàn tất đơn hàng" });
   } catch (err) {
     console.error("receiveOrder error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -622,7 +622,7 @@ export const refundOrder = async (req, res) => {
     if (!canRequestRefund(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
-        .json({ message: "Chi co the yeu cau hoan tien khi don dang xu ly" });
+        .json({ message: "Chỉ có thể yêu cầu hoàn tiền khi đơn đang xử lý" });
     }
 
     await releaseOrderReservations(order);
@@ -631,7 +631,7 @@ export const refundOrder = async (req, res) => {
     order.paymentStatus = EPaymentStatus.Refunded;
     await order.save();
 
-    return res.json({ order, message: "Da yeu cau hoan tien thanh cong" });
+    return res.json({ order, message: "Đã yêu cầu hoàn tiền thành công" });
   } catch (err) {
     console.error("refundOrder error:", err);
     return res.status(500).json({ message: "Server error" });

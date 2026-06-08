@@ -330,7 +330,7 @@ export const AdminOrders = () => {
             Không tìm thấy đơn nào
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Thu doi tu khoa tim kiem hoac bo loc trang thai.
+            Thử đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái.
           </p>
         </section>
       ) : (
@@ -369,7 +369,7 @@ export const AdminOrders = () => {
                   <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Khach hang
+                        Khách hàng
                       </div>
                       <div className="mt-1 font-semibold text-slate-950">
                         {order.customerName}

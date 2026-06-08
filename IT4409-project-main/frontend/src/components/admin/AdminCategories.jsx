@@ -136,7 +136,7 @@ export default function AdminCategories() {
     setError("");
 
     if (!form.name.trim()) {
-      setError("Ten danh muc khong duoc de trong.");
+      setError("Tên danh mục không được để trống.");
       return;
     }
 
@@ -172,7 +172,7 @@ export default function AdminCategories() {
           getAuthConfig()
         );
       } else {
-        if (!window.confirm("An danh muc nay khoi storefront?")) return;
+        if (!window.confirm("Ẩn danh mục này khỏi storefront?")) return;
         await axios.delete(buildApiUrl(`/categories/${category._id}`), getAuthConfig());
       }
 
@@ -351,7 +351,7 @@ export default function AdminCategories() {
                   ) : (
                     <Trash2 size={16} />
                   )}
-                  {category.isActive === false ? "Bat lai" : "An danh muc"}
+                  {category.isActive === false ? "Bật lại" : "Ẩn danh mục"}
                 </button>
               </div>
             </article>
@@ -405,7 +405,7 @@ export default function AdminCategories() {
                       setForm((prev) => ({ ...prev, slug: event.target.value }))
                     }
                     className={inputClass}
-                    placeholder="Tu dong sinh neu de trong"
+                    placeholder="Tự động sinh nếu để trống"
                   />
                 </div>
               </div>
@@ -446,7 +446,7 @@ export default function AdminCategories() {
                     }))
                   }
                   className={`${inputClass} min-h-[120px] resize-y`}
-                  placeholder="Moi dong mot danh muc con"
+                  placeholder="Mỗi dòng một danh mục con"
                 />
               </div>
 

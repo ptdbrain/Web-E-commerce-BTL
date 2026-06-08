@@ -39,15 +39,15 @@ export const calculateVoucherPricing = ({
   nowDate = new Date(),
 }) => {
   if (!userId) {
-    return { errorMessage: "Ban can dang nhap." };
+    return { errorMessage: "Bạn cần đăng nhập." };
   }
 
   if (!voucher || !voucher.isActive) {
-    return { errorMessage: "Voucher khong ton tai hoac da bi vo hieu." };
+    return { errorMessage: "Voucher không tồn tại hoặc đã bị vô hiệu." };
   }
 
   if (voucher.maxUsage && voucher.maxUsage > 0 && voucher.usedCount >= voucher.maxUsage) {
-    return { errorMessage: "Voucher da het luot su dung." };
+    return { errorMessage: "Voucher đã hết lượt sử dụng." };
   }
 
   const startDate = normalizeDate(voucher.startDate);
@@ -55,17 +55,17 @@ export const calculateVoucherPricing = ({
   const effectiveNow = normalizeDate(nowDate) || new Date();
 
   if (startDate && startDate > effectiveNow) {
-    return { errorMessage: "Voucher chua bat dau hieu luc." };
+    return { errorMessage: "Voucher chưa bắt đầu hiệu lực." };
   }
 
   if (endDate && endDate < effectiveNow) {
-    return { errorMessage: "Voucher da het han." };
+    return { errorMessage: "Voucher đã hết hạn." };
   }
 
   if (!voucher.appliesToAllUsers) {
     const allowedUsers = toIdSet(voucher.users || []);
     if (!allowedUsers.has(String(userId))) {
-      return { errorMessage: "Ban khong duoc su dung voucher nay." };
+      return { errorMessage: "Bạn không được sử dụng voucher này." };
     }
   }
 
@@ -79,9 +79,9 @@ export const calculateVoucherPricing = ({
 
   if (voucher.minOrderValue && totalOrder < voucher.minOrderValue) {
     return {
-      errorMessage: `Don hang can toi thieu ${voucher.minOrderValue.toLocaleString(
+      errorMessage: `Đơn hàng cần tối thiểu ${voucher.minOrderValue.toLocaleString(
         "vi-VN"
-      )}d de dung voucher nay.`,
+      )}đ để dùng voucher này.`,
     };
   }
 
@@ -111,7 +111,7 @@ export const calculateVoucherPricing = ({
 
   if (!scopeAll && eligibleSubtotal <= 0) {
     return {
-      errorMessage: "Khong co mon nao trong don hang duoc ap dung voucher.",
+      errorMessage: "Không có món nào trong đơn hàng được áp dụng voucher.",
       itemResults,
       voucher,
       eligibleSubtotal: 0,
@@ -130,7 +130,7 @@ export const calculateVoucherPricing = ({
   if (voucher.discountType === "free_shipping") {
     if (fulfillmentType !== "delivery") {
       return {
-        errorMessage: "Voucher chi ap dung cho don giao hang.",
+        errorMessage: "Voucher chỉ áp dụng cho đơn giao hàng.",
         itemResults,
         voucher,
         eligibleSubtotal,
@@ -147,7 +147,7 @@ export const calculateVoucherPricing = ({
   } else {
     if (eligibleSubtotal <= 0) {
       return {
-        errorMessage: "Khong co mon nao trong don hang duoc ap dung voucher.",
+        errorMessage: "Không có món nào trong đơn hàng được áp dụng voucher.",
         itemResults,
         voucher,
         eligibleSubtotal: 0,

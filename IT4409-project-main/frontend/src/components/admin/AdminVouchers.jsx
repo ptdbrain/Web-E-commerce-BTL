@@ -92,7 +92,7 @@ const voucherToForm = (voucher = {}) => {
 
 const getTargetSummary = (form) => {
   if (form.appliesToAllProducts) return "Toàn bộ menu";
-  return `${form.productIds.length} mon | ${form.categoryIds.length} danh muc`;
+  return `${form.productIds.length} món | ${form.categoryIds.length} danh mục`;
 };
 
 export default function AdminVouchers() {
@@ -473,7 +473,7 @@ export default function AdminVouchers() {
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Đang hoạt động", value: stats.active },
-            { label: "Sap het han", value: stats.expiringSoon },
+            { label: "Sắp hết hạn", value: stats.expiringSoon },
             { label: "Voucher target", value: stats.targeted },
             { label: "Tổng lượt sử dụng", value: stats.totalUses },
           ].map((card) => (

@@ -93,12 +93,12 @@ export const googleLogin = async (req, res) => {
       payload = await verifyGoogleIdToken(idToken);
     } catch (err) {
       console.error("verifyGoogleIdToken failed", err);
-      return res.status(401).json({ message: "Token Google khong hop le." });
+      return res.status(401).json({ message: "Token Google không hợp lệ." });
     }
 
     const { email, name, sub } = payload || {};
     if (!email) {
-      return res.status(400).json({ message: "Khong lay duoc email tu Google." });
+      return res.status(400).json({ message: "Không lấy được email từ Google." });
     }
 
     let user = await User.findOne({ email });
@@ -150,21 +150,21 @@ export const register = async (req, res) => {
     } = req.body;
 
     if (!username || !password || !confirmPassword || !email || !fullname || !phoneNumber || !address) {
-      return res.status(400).json({ message: "Vui long dien day du thong tin." });
+      return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin." });
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: "Mat khau va xac nhan mat khau khong khop." });
+      return res.status(400).json({ message: "Mật khẩu và xác nhận mật khẩu không khớp." });
     }
 
     const existing = await User.findOne({ username });
     if (existing) {
-      return res.status(409).json({ message: "Ten dang nhap da duoc su dung." });
+      return res.status(409).json({ message: "Tên đăng nhập đã được sử dụng." });
     }
 
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
-      return res.status(409).json({ message: "Email da duoc su dung." });
+      return res.status(409).json({ message: "Email đã được sử dụng." });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -202,34 +202,34 @@ export const completeGoogleProfile = async (req, res) => {
     } = req.body;
 
     if (!googleSignupToken) {
-      return res.status(400).json({ message: "Thieu thong tin xac thuc Google." });
+      return res.status(400).json({ message: "Thiếu thông tin xác thực Google." });
     }
 
     let decoded;
     try {
       decoded = jwt.verify(googleSignupToken, JWT_SECRET);
     } catch {
-      return res.status(401).json({ message: "Phien Google da het han hoac khong hop le." });
+      return res.status(401).json({ message: "Phiên Google đã hết hạn hoặc không hợp lệ." });
     }
 
     if (!decoded || decoded.type !== "google-signup" || !decoded.email) {
-      return res.status(400).json({ message: "Du lieu Google khong hop le." });
+      return res.status(400).json({ message: "Dữ liệu Google không hợp lệ." });
     }
 
     const email = decoded.email;
     const googleSub = decoded.sub || "";
 
     if (!username || !password || !confirmPassword || !fullname || !phoneNumber || !address) {
-      return res.status(400).json({ message: "Vui long dien day du thong tin." });
+      return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin." });
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: "Mat khau va xac nhan mat khau khong khop." });
+      return res.status(400).json({ message: "Mật khẩu và xác nhận mật khẩu không khớp." });
     }
 
     const existingUserByUsername = await User.findOne({ username });
     if (existingUserByUsername) {
-      return res.status(409).json({ message: "Ten dang nhap da duoc su dung." });
+      return res.status(409).json({ message: "Tên đăng nhập đã được sử dụng." });
     }
 
     const existingUserByEmail = await User.findOne({ email });
@@ -310,14 +310,14 @@ export const forgotPasswordRequest = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: "Vui long nhap email." });
+      return res.status(400).json({ message: "Vui lòng nhập email." });
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
       return res.json({
-        message: "Neu email ton tai, chung toi da gui ma xac thuc.",
+        message: "Nếu email tồn tại, chúng tôi đã gửi mã xác thực.",
       });
     }
 
@@ -333,7 +333,7 @@ export const forgotPasswordRequest = async (req, res) => {
     }
 
     return res.json({
-      message: "Neu email ton tai, chung toi da gui ma xac thuc.",
+      message: "Nếu email tồn tại, chúng tôi đã gửi mã xác thực.",
     });
   } catch (err) {
     console.error(err);
@@ -346,33 +346,33 @@ export const resetPasswordWithCode = async (req, res) => {
     const { email, code, newPassword, confirmPassword } = req.body;
 
     if (!email || !code || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: "Vui long nhap day du thong tin." });
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin." });
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: "Mat khau moi va xac nhan khong khop." });
+      return res.status(400).json({ message: "Mật khẩu mới và xác nhận không khớp." });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "Ma xac thuc khong hop le hoac da het han." });
+      return res.status(400).json({ message: "Mã xác thực không hợp lệ hoặc đã hết hạn." });
     }
 
     if (!user.passwordResetCode || !user.passwordResetExpires) {
       return res.status(400).json({
-        message: "Khong co ma dat lai mat khau hop le. Vui long yeu cau lai.",
+        message: "Không có mã đặt lại mật khẩu hợp lệ. Vui lòng yêu cầu lại.",
       });
     }
 
     const now = new Date();
     if (user.passwordResetExpires < now) {
       return res.status(400).json({
-        message: "Ma dat lai mat khau da het han. Vui long yeu cau lai.",
+        message: "Mã đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu lại.",
       });
     }
 
     if (user.passwordResetCode !== hashResetCode(code)) {
-      return res.status(400).json({ message: "Ma xac thuc khong dung." });
+      return res.status(400).json({ message: "Mã xác thực không đúng." });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -385,7 +385,7 @@ export const resetPasswordWithCode = async (req, res) => {
     await user.save();
 
     return res.json({
-      message: "Dat lai mat khau thanh cong. Ban co the dang nhap voi mat khau moi.",
+      message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.",
     });
   } catch (err) {
     console.error(err);

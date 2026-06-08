@@ -76,7 +76,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 Order #{formatShortId(order._id)}
               </div>
               <h3 className="mt-3 font-display text-2xl font-black tracking-tight text-slate-950">
-                Chi tiet don hang
+                Chi tiết đơn hàng
               </h3>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span
@@ -126,7 +126,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
               <article className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <Users size={16} className="text-orange-500" />
-                  Khach hang
+                  Khách hàng
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-slate-600">
                   <div className="font-semibold text-slate-900">{order.customerName}</div>
@@ -138,7 +138,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
               <article className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <MapPin size={16} className="text-orange-500" />
-                  Hinh thuc nhan mon
+                  Hình thức nhận món
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-slate-600">
                   <div className="font-semibold text-slate-900">
@@ -146,7 +146,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                   </div>
                   <div>{getFulfillmentDetail(order)}</div>
                   {order.tableBooking?.contactNote ? (
-                    <div>Ghi chu: {order.tableBooking.contactNote}</div>
+                    <div>Ghi chú: {order.tableBooking.contactNote}</div>
                   ) : null}
                 </div>
               </article>
@@ -155,7 +155,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
             <section className="rounded-[24px] border border-slate-100 bg-white">
               <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 text-sm font-semibold text-slate-900">
                 <UtensilsCrossed size={16} className="text-orange-500" />
-                Mon trong don
+                Món trong đơn
               </div>
               <div className="space-y-4 p-5">
                 {(order.items || []).map((item, index) => {
@@ -193,7 +193,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                               {item.productName || "Menu item"}
                             </div>
                             <div className="mt-1 text-sm text-slate-500">
-                              So luong: {item.quantity || 1}
+                              Số lượng: {item.quantity || 1}
                             </div>
                           </div>
                           <div className="text-sm font-semibold text-slate-900">
@@ -223,7 +223,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
 
                         {item.itemNote ? (
                           <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                            Ghi chu: {item.itemNote}
+                            Ghi chú: {item.itemNote}
                           </div>
                         ) : null}
                       </div>
@@ -238,7 +238,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
             <article className="rounded-[24px] border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <CalendarClock size={16} className="text-orange-500" />
-                Moc thoi gian
+                Mốc thời gian
               </div>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div>
@@ -252,7 +252,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 {order.pickupTime ? (
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Gio pickup
+                      Giờ pickup
                     </div>
                     <div className="mt-1 font-semibold text-slate-900">
                       {formatDateTime(order.pickupTime)}
@@ -262,7 +262,7 @@ export const OrderDetailModal = ({ order, onClose }) => {
                 {order.tableBooking?.bookingTime ? (
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Gio dat ban
+                      Giờ đặt bàn
                     </div>
                     <div className="mt-1 font-semibold text-slate-900">
                       {formatDateTime(order.tableBooking.bookingTime)}
@@ -275,23 +275,23 @@ export const OrderDetailModal = ({ order, onClose }) => {
             <article className="rounded-[24px] border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <ReceiptText size={16} className="text-orange-500" />
-                Thanh toan
+                Thanh toán
               </div>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div className="flex items-center justify-between">
-                  <span>Tam tinh</span>
+                  <span>Tạm tính</span>
                   <span className="font-semibold text-slate-900">
                     {formatPriceAdmin(subtotal)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Phi giao hang</span>
+                  <span>Phí giao hàng</span>
                   <span className="font-semibold text-slate-900">
                     {formatPriceAdmin(deliveryFee)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Giam gia</span>
+                  <span>Giảm giá</span>
                   <span className="font-semibold text-emerald-600">
                     -{formatPriceAdmin(discountAmount)}
                   </span>
@@ -321,10 +321,10 @@ export const OrderDetailModal = ({ order, onClose }) => {
             <article className="rounded-[24px] border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <CreditCard size={16} className="text-orange-500" />
-                Ghi chu admin
+                Ghi chú admin
               </div>
               <div className="mt-4 text-sm leading-6 text-slate-500">
-                {order.note || "Khach khong de lai ghi chu them cho don hang nay."}
+                {order.note || "Khách không để lại ghi chú thêm cho đơn hàng này."}
               </div>
             </article>
           </div>

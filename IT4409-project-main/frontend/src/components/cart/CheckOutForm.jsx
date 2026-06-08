@@ -82,7 +82,7 @@ export function CheckoutForm({ formData, setFormData }) {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              placeholder="Nguyen Van A"
+              placeholder="Nguyễn Văn A"
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
               required
             />

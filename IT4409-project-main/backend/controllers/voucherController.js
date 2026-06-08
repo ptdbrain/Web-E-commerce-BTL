@@ -40,11 +40,11 @@ export const calculateVoucherForItems = async ({
   fulfillmentType = "delivery",
 }) => {
   if (!userId) {
-    return { errorMessage: "Ban can dang nhap." };
+    return { errorMessage: "Bạn cần đăng nhập." };
   }
 
   if (!code || !Array.isArray(items)) {
-    return { errorMessage: "Thieu ma voucher hoac danh sach san pham." };
+    return { errorMessage: "Thiếu mã voucher hoặc danh sách sản phẩm." };
   }
 
   const voucher = await Voucher.findOne({
@@ -52,7 +52,7 @@ export const calculateVoucherForItems = async ({
   }).lean();
 
   if (!voucher) {
-    return { errorMessage: "Voucher khong ton tai hoac da bi vo hieu." };
+    return { errorMessage: "Voucher không tồn tại hoặc đã bị vô hiệu." };
   }
 
   const pricingItems = await enrichPricingItems(items);
@@ -78,17 +78,17 @@ export const createVoucher = async (req, res) => {
 
     const existing = await Voucher.findOne({ code: normalized.code }).lean();
     if (existing) {
-      return res.status(409).json({ message: "Ma voucher da ton tai." });
+      return res.status(409).json({ message: "Mã voucher đã tồn tại." });
     }
 
     const voucher = await Voucher.create(normalized);
     return res.status(201).json({ voucher });
   } catch (err) {
     if (err?.code === 11000) {
-      return res.status(409).json({ message: "Ma voucher da ton tai." });
+      return res.status(409).json({ message: "Mã voucher đã tồn tại." });
     }
     console.error("createVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi tao voucher." });
+    return res.status(500).json({ message: "Lỗi server khi tạo voucher." });
   }
 };
 
@@ -112,7 +112,7 @@ export const getVouchers = async (req, res) => {
     return res.json({ vouchers });
   } catch (err) {
     console.error("getVouchers error", err);
-    return res.status(500).json({ message: "Loi server khi lay danh sach voucher." });
+    return res.status(500).json({ message: "Lỗi server khi lấy danh sách voucher." });
   }
 };
 
@@ -120,7 +120,7 @@ export const getAvailableVouchersForUser = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ message: "Ban can dang nhap." });
+      return res.status(401).json({ message: "Bạn cần đăng nhập." });
     }
 
     const vouchers = await Voucher.find({ isActive: true })
@@ -163,7 +163,7 @@ export const getAvailableVouchersForUser = async (req, res) => {
     console.error("getAvailableVouchersForUser error", err);
     return res
       .status(500)
-      .json({ message: "Loi server khi lay danh sach voucher kha dung." });
+      .json({ message: "Lỗi server khi lấy danh sách voucher khả dụng." });
   }
 };
 
@@ -171,7 +171,7 @@ export const getVoucherById = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID voucher khong hop le." });
+      return res.status(400).json({ message: "ID voucher không hợp lệ." });
     }
 
     const voucher = await Voucher.findById(id)
@@ -181,13 +181,13 @@ export const getVoucherById = async (req, res) => {
       .lean();
 
     if (!voucher) {
-      return res.status(404).json({ message: "Khong tim thay voucher." });
+      return res.status(404).json({ message: "Không tìm thấy voucher." });
     }
 
     return res.json({ voucher });
   } catch (err) {
     console.error("getVoucherById error", err);
-    return res.status(500).json({ message: "Loi server khi lay voucher." });
+    return res.status(500).json({ message: "Lỗi server khi lấy voucher." });
   }
 };
 
@@ -195,7 +195,7 @@ export const updateVoucher = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID voucher khong hop le." });
+      return res.status(400).json({ message: "ID voucher không hợp lệ." });
     }
 
     const normalized = normalizeVoucherPayload(req.body, { partial: true });
@@ -210,16 +210,16 @@ export const updateVoucher = async (req, res) => {
     }).lean();
 
     if (!voucher) {
-      return res.status(404).json({ message: "Khong tim thay voucher." });
+      return res.status(404).json({ message: "Không tìm thấy voucher." });
     }
 
     return res.json({ voucher });
   } catch (err) {
     if (err?.code === 11000) {
-      return res.status(409).json({ message: "Ma voucher da ton tai." });
+      return res.status(409).json({ message: "Mã voucher đã tồn tại." });
     }
     console.error("updateVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi cap nhat voucher." });
+    return res.status(500).json({ message: "Lỗi server khi cập nhật voucher." });
   }
 };
 
@@ -227,7 +227,7 @@ export const deleteVoucher = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID voucher khong hop le." });
+      return res.status(400).json({ message: "ID voucher không hợp lệ." });
     }
 
     const voucher = await Voucher.findByIdAndUpdate(
@@ -236,13 +236,13 @@ export const deleteVoucher = async (req, res) => {
       { new: true }
     ).lean();
     if (!voucher) {
-      return res.status(404).json({ message: "Khong tim thay voucher." });
+      return res.status(404).json({ message: "Không tìm thấy voucher." });
     }
 
-    return res.json({ voucher, message: "Da vo hieu hoa voucher." });
+    return res.json({ voucher, message: "Đã vô hiệu hóa voucher." });
   } catch (err) {
     console.error("deleteVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi xoa voucher." });
+    return res.status(500).json({ message: "Lỗi server khi xóa voucher." });
   }
 };
 
@@ -264,7 +264,7 @@ export const searchUsersForVoucher = async (req, res) => {
     return res.json({ users });
   } catch (err) {
     console.error("searchUsersForVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi tim kiem nguoi dung." });
+    return res.status(500).json({ message: "Lỗi server khi tìm kiếm người dùng." });
   }
 };
 
@@ -286,7 +286,7 @@ export const searchProductsForVoucher = async (req, res) => {
     return res.json({ products });
   } catch (err) {
     console.error("searchProductsForVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi tim kiem san pham." });
+    return res.status(500).json({ message: "Lỗi server khi tìm kiếm sản phẩm." });
   }
 };
 
@@ -308,7 +308,7 @@ export const searchCategoriesForVoucher = async (req, res) => {
     return res.json({ categories });
   } catch (err) {
     console.error("searchCategoriesForVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi tim kiem danh muc." });
+    return res.status(500).json({ message: "Lỗi server khi tìm kiếm danh mục." });
   }
 };
 
@@ -316,7 +316,7 @@ export const applyVoucher = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return res.status(401).json({ message: "Ban can dang nhap." });
+      return res.status(401).json({ message: "Bạn cần đăng nhập." });
     }
 
     const { code, items, orderTotal, deliveryFee, fulfillmentType } = req.body || {};
@@ -360,7 +360,7 @@ export const applyVoucher = async (req, res) => {
     });
   } catch (err) {
     console.error("applyVoucher error", err);
-    return res.status(500).json({ message: "Loi server khi ap dung voucher." });
+    return res.status(500).json({ message: "Lỗi server khi áp dụng voucher." });
   }
 };
 

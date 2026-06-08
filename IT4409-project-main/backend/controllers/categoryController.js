@@ -11,7 +11,7 @@ const publicSelect = "name slug icon image subcategories isActive";
 
 const handleDuplicateCategory = (err, res) => {
   if (err?.code === 11000) {
-    return res.status(409).json({ message: "Danh muc hoac slug da ton tai." });
+    return res.status(409).json({ message: "Danh mục hoặc slug đã tồn tại." });
   }
   return null;
 };
@@ -43,7 +43,7 @@ export const getAdminCategories = async (req, res) => {
     return res.json({ categories: sortCategoriesForMenu(categories) });
   } catch (err) {
     console.error("getAdminCategories error", err);
-    return res.status(500).json({ message: "Loi server khi lay danh muc." });
+    return res.status(500).json({ message: "Lỗi server khi lấy danh mục." });
   }
 };
 
@@ -59,11 +59,11 @@ export const createCategory = async (req, res) => {
   } catch (err) {
     if (handleDuplicateCategory(err, res)) return;
     if (err?.message === "Category name is required") {
-      return res.status(400).json({ message: "Ten danh muc khong duoc de trong." });
+      return res.status(400).json({ message: "Tên danh mục không được để trống." });
     }
 
     console.error("createCategory error", err);
-    return res.status(500).json({ message: "Loi server khi tao danh muc." });
+    return res.status(500).json({ message: "Lỗi server khi tạo danh mục." });
   }
 };
 
@@ -71,7 +71,7 @@ export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID danh muc khong hop le." });
+      return res.status(400).json({ message: "ID danh mục không hợp lệ." });
     }
 
     const payload = normalizeCategoryPayload(req.body, { partial: true });
@@ -81,14 +81,14 @@ export const updateCategory = async (req, res) => {
     }).lean();
 
     if (!category) {
-      return res.status(404).json({ message: "Khong tim thay danh muc." });
+      return res.status(404).json({ message: "Không tìm thấy danh mục." });
     }
 
     return res.json({ category });
   } catch (err) {
     if (handleDuplicateCategory(err, res)) return;
     console.error("updateCategory error", err);
-    return res.status(500).json({ message: "Loi server khi cap nhat danh muc." });
+    return res.status(500).json({ message: "Lỗi server khi cập nhật danh mục." });
   }
 };
 
@@ -96,7 +96,7 @@ export const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: "ID danh muc khong hop le." });
+      return res.status(400).json({ message: "ID danh mục không hợp lệ." });
     }
 
     const category = await Category.findByIdAndUpdate(
@@ -106,7 +106,7 @@ export const deleteCategory = async (req, res) => {
     ).lean();
 
     if (!category) {
-      return res.status(404).json({ message: "Khong tim thay danh muc." });
+      return res.status(404).json({ message: "Không tìm thấy danh mục." });
     }
 
     await Product.updateMany(
@@ -114,10 +114,10 @@ export const deleteCategory = async (req, res) => {
       { isActive: false, isAvailable: false }
     );
 
-    return res.json({ category, message: "Da an danh muc." });
+    return res.json({ category, message: "Đã ẩn danh mục." });
   } catch (err) {
     console.error("deleteCategory error", err);
-    return res.status(500).json({ message: "Loi server khi an danh muc." });
+    return res.status(500).json({ message: "Lỗi server khi ẩn danh mục." });
   }
 };
 

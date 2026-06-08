@@ -66,7 +66,7 @@ export default function RegisterPage() {
   };
 
   const fields = [
-    { name: "fullname", label: "Họ và tên", type: "text", icon: FiUser, placeholder: "Nguyen Van A" },
+    { name: "fullname", label: "Họ và tên", type: "text", icon: FiUser, placeholder: "Nguyễn Văn A" },
     { name: "email", label: "Email", type: "email", icon: FiMail, placeholder: "email@example.com" },
     { name: "username", label: "Tên đăng nhập", type: "text", icon: FiUser, placeholder: "username" },
     { name: "phoneNumber", label: "Số điện thoại", type: "tel", icon: FiPhone, placeholder: "09xxxxxxxx" },
