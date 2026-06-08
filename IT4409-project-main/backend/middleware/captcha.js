@@ -16,9 +16,9 @@ export const verifyCaptcha = async (req, res, next) => {
       });
     }
 
-    const secret = process.env.RECAPTCHA_SECRET;
+    const secret = process.env.RECAPTCHA_SECRET_KEY;
+    
     if (!secret) {
-      // Không có secret => coi như cấu hình sai, tránh cho qua trong production
       return res.status(500).json({
         success: false,
         message: 'Captcha secret is not configured on server',

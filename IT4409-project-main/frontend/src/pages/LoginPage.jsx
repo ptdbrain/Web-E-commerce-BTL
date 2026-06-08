@@ -4,6 +4,7 @@ import axios from "axios";
 import { FiUser, FiLock, FiArrowRight } from "react-icons/fi";
 import SEO from "../components/common/SEO";
 import { buildApiUrl } from "../config/api";
+import ReCAPTCHA from "react-google-recaptcha"; 
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -11,15 +12,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState(""); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+
+    if (!captchaToken) {
+      setError("Vui lòng xác thực bạn không phải là người máy.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await axios.post(buildApiUrl("/login"), {
         username,
         password,
+        captchaToken,
       });
       const user = res.data.user;
       const token = res.data.token;
@@ -115,6 +125,14 @@ export default function LoginPage() {
                     placeholder="Mật khẩu"
                   />
                 </div>
+              </div>
+
+              {/* 5. Chèn ReCAPTCHA vào giao diện */}
+              <div className="flex justify-center py-2">
+                <ReCAPTCHA
+                  sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                  onChange={(token) => setCaptchaToken(token)}
+                />
               </div>
 
               <button
