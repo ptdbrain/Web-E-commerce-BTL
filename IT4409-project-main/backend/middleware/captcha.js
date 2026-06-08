@@ -16,7 +16,7 @@ export const verifyCaptcha = async (req, res, next) => {
       });
     }
 
-    const secret = process.env.RECAPTCHA_SECRET_KEY;
+    const secret = process.env.RECAPTCHA_SECRET;
     
     if (!secret) {
       return res.status(500).json({
