@@ -24,6 +24,7 @@ import {
 import {
   getCartSessionTransition,
   getStoredUserId,
+  isCurrentCartSession,
   shouldHydrateStoredCart,
 } from "../utils/cartSession.js";
 import { CartContext } from "./CartContextBase.js";
@@ -184,12 +185,14 @@ export function CartProvider({ children }) {
 
       try {
         let remoteCart = await fetchCart(authToken);
+        if (!isCurrentCartSession(authToken, getStoredToken())) return;
 
         for (const guestItem of guestItems.map(normalizeCartItem)) {
           remoteCart = await addCartItemRequest(
             authToken,
             buildCartApiItemPayload(guestItem)
           );
+          if (!isCurrentCartSession(authToken, getStoredToken())) return;
         }
 
         applyServerCart(remoteCart);
@@ -226,6 +229,7 @@ export function CartProvider({ children }) {
       // TRƯỜNG HỢP 2: Từ Có tài khoản -> Đăng xuất (ĐÃ THÊM LOGIC DỌN RÁC Ở ĐÂY)
       else if (transition === "clear") {
         guestCartSnapshotRef.current = [];
+        cartItemsRef.current = [];
         setCartItems([]);
         setSelectedItemIds([]);
         setIsManualSelection(false);

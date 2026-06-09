@@ -1,5 +1,8 @@
 export const shouldHydrateStoredCart = (token) => !String(token || "").trim();
 
+export const isCurrentCartSession = (expectedToken, currentToken) =>
+  Boolean(expectedToken) && expectedToken === currentToken;
+
 export const getCartSessionTransition = (previousUserId, nextUserId) => {
   const previous = String(previousUserId || "");
   const next = String(nextUserId || "");
