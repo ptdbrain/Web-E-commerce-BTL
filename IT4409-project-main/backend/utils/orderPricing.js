@@ -97,15 +97,27 @@ export const priceOrderItemsFromProducts = (items = [], products = []) => {
   }
 
   const productLookup = getProductLookup(products);
+  const requestedQuantityByProduct = new Map();
+
+  for (const item of items) {
+    const productId = normalizeId(item.productId || item.id || item._id);
+    const product = requireProduct(productLookup, productId);
+    const requestedQuantity =
+      (requestedQuantityByProduct.get(productId) || 0) +
+      normalizeQuantity(item.quantity);
+    requestedQuantityByProduct.set(productId, requestedQuantity);
+
+    if (toNumber(product.stock, 0) < requestedQuantity) {
+      throw new Error(
+        `Product ${product.name || productId} has not enough stock`
+      );
+    }
+  }
 
   return items.map((item) => {
     const productId = normalizeId(item.productId || item.id || item._id);
     const product = requireProduct(productLookup, productId);
     const quantity = normalizeQuantity(item.quantity);
-
-    if (toNumber(product.stock, 0) < quantity) {
-      throw new Error(`Product ${product.name || productId} has not enough stock`);
-    }
 
     const selectedSize = resolveSize(product, item.selectedSize);
     const selectedAddons = resolveAddons(product, item.selectedAddons);

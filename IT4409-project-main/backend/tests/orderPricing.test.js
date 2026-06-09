@@ -91,3 +91,50 @@ test("priceOrderItemsFromProducts rejects unavailable stock and options", () => 
     /not available/i
   );
 });
+
+test("priceOrderItemsFromProducts prices a combined order with multiple products", () => {
+  const secondProduct = product({
+    _id: "64f100000000000000000002",
+    name: "Khoai tay chien",
+    price: 39000,
+    discountPrice: undefined,
+    category: "64f200000000000000000002",
+    sizes: [],
+    addons: [],
+  });
+
+  const items = priceOrderItemsFromProducts(
+    [
+      { productId: "64f100000000000000000001", quantity: 2 },
+      { productId: "64f100000000000000000002", quantity: 3 },
+    ],
+    [product(), secondProduct]
+  );
+
+  assert.equal(items.length, 2);
+  assert.equal(items[0].lineTotal, 138000);
+  assert.equal(items[1].lineTotal, 117000);
+});
+
+test("priceOrderItemsFromProducts checks aggregate stock across configured lines", () => {
+  assert.throws(
+    () =>
+      priceOrderItemsFromProducts(
+        [
+          {
+            productId: "64f100000000000000000001",
+            cartKey: "burger::regular::::",
+            quantity: 6,
+          },
+          {
+            productId: "64f100000000000000000001",
+            cartKey: "burger::large::::",
+            quantity: 5,
+            selectedSize: { label: "Large" },
+          },
+        ],
+        [product({ stock: 10 })]
+      ),
+    /not enough stock/i
+  );
+});

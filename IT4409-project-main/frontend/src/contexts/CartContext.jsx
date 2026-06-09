@@ -21,6 +21,11 @@ import {
   getItemBasePrice,
   mapServerCartItem,
 } from "../utils/cartPayload.js";
+import {
+  getCartSessionTransition,
+  getStoredUserId,
+  shouldHydrateStoredCart,
+} from "../utils/cartSession.js";
 import { CartContext } from "./CartContextBase.js";
 
 const getStoredToken = () => localStorage.getItem("token") || "";
@@ -37,6 +42,10 @@ const createDefaultFormData = () => ({
 });
 
 const readStoredCartItems = () => {
+  if (!shouldHydrateStoredCart(getStoredToken())) {
+    return [];
+  }
+
   try {
     const savedCart = JSON.parse(localStorage.getItem("cartItems") || "[]");
     return Array.isArray(savedCart) ? savedCart : [];
@@ -158,7 +167,7 @@ export function CartProvider({ children }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [orders, setOrders] = useState([]);
-  const authTokenRef = useRef(authToken);
+  const authUserIdRef = useRef(getStoredUserId());
   const cartItemsRef = useRef(cartItems);
   const guestCartSnapshotRef = useRef([]);
 
@@ -192,12 +201,10 @@ export function CartProvider({ children }) {
   );
 
   useEffect(() => {
-    localStorage.setItem("cartItems", JSON.stringify(cartItems));
-  }, [cartItems]);
-
-  useEffect(() => {
-    authTokenRef.current = authToken;
-  }, [authToken]);
+    if (!authToken) {
+      localStorage.setItem("cartItems", JSON.stringify(cartItems));
+    }
+  }, [authToken, cartItems]);
 
   useEffect(() => {
     cartItemsRef.current = cartItems;
@@ -206,18 +213,27 @@ export function CartProvider({ children }) {
   useEffect(() => {
     const handleAuthChanged = () => {
       const nextToken = getStoredToken();
+      const nextUserId = getStoredUserId();
+      const transition = getCartSessionTransition(
+        authUserIdRef.current,
+        nextUserId
+      );
 
       // TRƯỜNG HỢP 1: Từ Khách vãng lai -> Đăng nhập
-      if (!authTokenRef.current && nextToken) {
+      if (transition === "merge-guest" && nextToken) {
         guestCartSnapshotRef.current = cartItemsRef.current;
       } 
       // TRƯỜNG HỢP 2: Từ Có tài khoản -> Đăng xuất (ĐÃ THÊM LOGIC DỌN RÁC Ở ĐÂY)
-      else if (authTokenRef.current && !nextToken) {
+      else if (transition === "clear") {
+        guestCartSnapshotRef.current = [];
         setCartItems([]);
+        setSelectedItemIds([]);
+        setIsManualSelection(false);
         setDirectCheckoutItems([]);
         localStorage.removeItem("cartItems");
       }
 
+      authUserIdRef.current = nextUserId;
       setAuthToken(nextToken);
     };
 
