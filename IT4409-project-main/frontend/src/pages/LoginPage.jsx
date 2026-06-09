@@ -6,52 +6,6 @@ import SEO from "../components/common/SEO";
 import { buildApiUrl } from "../config/api";
 import ReCAPTCHA from "react-google-recaptcha"; 
 
-const getRecaptchaSiteKey = () => import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
-
-const loadRecaptchaScript = (siteKey) =>
-  new Promise((resolve, reject) => {
-    if (!siteKey) {
-      resolve(null);
-      return;
-    }
-
-    if (window.grecaptcha?.execute) {
-      resolve(window.grecaptcha);
-      return;
-    }
-
-    const existingScript = document.querySelector("script[data-recaptcha='true']");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(window.grecaptcha));
-      existingScript.addEventListener("error", reject);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.recaptcha = "true";
-    script.onload = () => resolve(window.grecaptcha);
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-
-const getCaptchaToken = async () => {
-  const siteKey = getRecaptchaSiteKey();
-  if (!siteKey) return "";
-
-  const grecaptcha = await loadRecaptchaScript(siteKey);
-  if (!grecaptcha?.execute) return "";
-
-  return new Promise((resolve) => {
-    grecaptcha.ready(async () => {
-      const token = await grecaptcha.execute(siteKey, { action: "login" });
-      resolve(token);
-    });
-  });
-};
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -64,7 +18,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-
     if (!captchaToken) {
       setError("Vui lòng xác thực bạn không phải là người máy.");
       return;
@@ -72,19 +25,26 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const captchaToken = await getCaptchaToken();
       const res = await axios.post(buildApiUrl("/login"), {
         username,
         password,
         captchaToken,
       });
+      
       const user = res.data.user;
       const token = res.data.token;
+      
       localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("token", token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       window.dispatchEvent(new Event("authChanged"));
-      navigate(user?.role === "admin" ? "/admin" : "/");
+      
+      // Chuyển hướng theo role: Admin vào trang quản trị, User vào trang chủ
+      if (user?.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     } catch (err) {
       setError(err?.response?.data?.message || "Đăng nhập thất bại");
     } finally {
@@ -174,7 +134,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* 5. Chèn ReCAPTCHA vào giao diện */}
+              {/* Chèn ReCAPTCHA vào giao diện */}
               <div className="flex justify-center py-2">
                 <ReCAPTCHA
                   sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
