@@ -1,5 +1,5 @@
 import express from "express";
-import { optionalAuth } from "../middleware/optionalAuth.js";
+import { authenticateToken } from "../middleware/auth.js";
 import {
   createReview,
   getReviewsByProduct,
@@ -8,6 +8,6 @@ import {
 const router = express.Router();
 
 router.get("/product/:productId", getReviewsByProduct);
-router.post("/product/:productId", optionalAuth, createReview);
+router.post("/product/:productId", authenticateToken, createReview);
 
 export default router;

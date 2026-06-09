@@ -17,45 +17,61 @@ import {
   getFulfillmentColor,
   getFulfillmentLabel,
   getPaymentLabel,
+  getPaymentStatusColor,
+  getPaymentStatusLabel,
   getStatusColor,
   getStatusLabel,
 } from "./utils";
 
 const statusFilters = [
-  { value: "all", label: "Tat ca" },
-  { value: "waiting_for_payment", label: "Cho thanh toan" },
-  { value: "pending", label: "Cho xu ly" },
-  { value: "shipping", label: "Dang phuc vu" },
-  { value: "confirmed", label: "Hoan tat" },
-  { value: "cancelled", label: "Da huy" },
-  { value: "refunded", label: "Da hoan tien" },
+  { value: "all", label: "Tất cả" },
+  { value: "waiting_for_payment", label: "Chờ thanh toán" },
+  { value: "pending", label: "Chờ xử lý" },
+  { value: "preparing", label: "Đang chế biến" },
+  { value: "ready", label: "Sẵn sàng giao" },
+  { value: "shipping", label: "Đang phục vụ" },
+  { value: "confirmed", label: "Hoàn tất" },
+  { value: "cancelled", label: "Đã hủy" },
+  { value: "refunded", label: "Đã hoàn tiền" },
 ];
 
 const fulfillmentFilters = [
-  { value: "all", label: "Moi hinh thuc" },
-  { value: "delivery", label: "Giao hang" },
-  { value: "pickup", label: "Tu den lay" },
-  { value: "dine_in", label: "Dat ban" },
+  { value: "all", label: "Mọi hình thức" },
+  { value: "delivery", label: "Giao hàng" },
+  { value: "pickup", label: "Tự đến lấy" },
+  { value: "dine_in", label: "Đặt bàn" },
 ];
 
 const getFulfillmentDetail = (order) => {
   if (order.fulfillmentType === "pickup") {
     return order.pickupTime
-      ? `Lay mon luc ${formatDateTime(order.pickupTime)}`
-      : "Khach tu den lay tai quay";
+      ? `Lấy món lúc ${formatDateTime(order.pickupTime)}`
+      : "Khách tự đến lấy tại quầy";
   }
 
   if (order.fulfillmentType === "dine_in") {
     const guestCount = order.tableBooking?.guestCount || 0;
-    return `${guestCount} khach • ${formatDateTime(order.tableBooking?.bookingTime)}`;
+    return `${guestCount} khách - ${formatDateTime(order.tableBooking?.bookingTime)}`;
   }
 
-  return order.shippingAddress || "Chua co dia chi giao hang";
+  return order.shippingAddress || "Chưa có địa chỉ giao hàng";
 };
 
-const canConfirmOrder = (status) => ["pending", "confirmed"].includes(status);
+const canConfirmOrder = (status) =>
+  ["pending", "preparing", "ready", "shipping"].includes(status);
 const canCancelOrder = (status) =>
   !["cancelled", "confirmed", "refunded"].includes(status);
+
+const getConfirmActionLabel = (order) => {
+  if (order.orderStatus === "pending") return "Nhận đơn";
+  if (order.orderStatus === "preparing") {
+    return order.fulfillmentType === "delivery" ? "Chuyển giao hàng" : "Sẵn sàng giao món";
+  }
+  if (order.orderStatus === "ready" || order.orderStatus === "shipping") {
+    return "Hoàn tất đơn";
+  }
+  return "Cập nhật đơn";
+};
 
 export const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -72,7 +88,7 @@ export const AdminOrders = () => {
   const loadOrders = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Can dang nhap voi quyen admin de xem don hang.");
+      setError("Cần đăng nhập với quyền admin để xem đơn hàng.");
       return;
     }
 
@@ -80,13 +96,13 @@ export const AdminOrders = () => {
     setError("");
 
     try {
-      const response = await axios.get(buildApiUrl("/orders"), {
+      const response = await axios.get(buildApiUrl("/orders?limit=200"), {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(Array.isArray(response.data?.orders) ? response.data.orders : []);
     } catch (err) {
       console.error("Failed to load orders", err);
-      setError(err?.response?.data?.message || "Khong the tai danh sach don.");
+      setError(err?.response?.data?.message || "Không thể tải danh sách đơn.");
       setOrders([]);
     } finally {
       setLoading(false);
@@ -127,7 +143,9 @@ export const AdminOrders = () => {
     () => ({
       total: orders.length,
       processing: orders.filter((order) =>
-        ["waiting_for_payment", "pending", "shipping"].includes(order.orderStatus)
+        ["waiting_for_payment", "pending", "preparing", "ready", "shipping"].includes(
+          order.orderStatus
+        )
       ).length,
       delivery: orders.filter((order) => order.fulfillmentType === "delivery").length,
       dineIn: orders.filter((order) => order.fulfillmentType === "dine_in").length,
@@ -142,7 +160,7 @@ export const AdminOrders = () => {
     setActingId(orderId);
 
     try {
-      await axios.put(
+      const response = await axios.put(
         buildApiUrl(`/orders/${orderId}/confirm`),
         {},
         {
@@ -152,11 +170,11 @@ export const AdminOrders = () => {
 
       setOrders((prev) =>
         prev.map((order) =>
-          order._id === orderId ? { ...order, orderStatus: "shipping" } : order
+          order._id === orderId ? { ...order, ...(response.data?.order || {}) } : order
         )
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Khong the xac nhan don hang.");
+      alert(err?.response?.data?.message || "Không thể xác nhận đơn hàng.");
     } finally {
       setActingId("");
     }
@@ -165,7 +183,7 @@ export const AdminOrders = () => {
   const handleCancelOrder = async (orderId) => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    if (!window.confirm("Huy don hang nay?")) return;
+    if (!window.confirm("Hủy đơn hàng này?")) return;
 
     setActingId(orderId);
 
@@ -184,7 +202,7 @@ export const AdminOrders = () => {
         )
       );
     } catch (err) {
-      alert(err?.response?.data?.message || "Khong the huy don hang.");
+      alert(err?.response?.data?.message || "Không thể hủy đơn hàng.");
     } finally {
       setActingId("");
     }
@@ -196,14 +214,14 @@ export const AdminOrders = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-100">
-              Don hang toan cua hang
+              Đơn hàng toàn cửa hàng
             </div>
             <h2 className="mt-4 font-display text-3xl font-black tracking-tight">
               FireBite Order Desk
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Theo doi don giao hang, pickup va dat ban trong cung mot bang dieu
-              phoi.
+              Theo dõi đơn giao hàng, pickup và đặt bàn trong cùng một bảng điều
+              phối.
             </p>
           </div>
 
@@ -213,16 +231,16 @@ export const AdminOrders = () => {
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <RefreshCw size={16} />
-            Tai lai danh sach
+            Tải lại danh sách
           </button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Tong don", value: stats.total },
-            { label: "Dang xu ly", value: stats.processing },
+            { label: "Tổng đơn", value: stats.total },
+            { label: "Đang xử lý", value: stats.processing },
             { label: "Delivery", value: stats.delivery },
-            { label: "Dat ban", value: stats.dineIn },
+            { label: "Đặt bàn", value: stats.dineIn },
           ].map((card) => (
             <div
               key={card.label}
@@ -249,7 +267,7 @@ export const AdminOrders = () => {
                 onChange={(event) =>
                   setFilters((prev) => ({ ...prev, query: event.target.value }))
                 }
-                placeholder="Tim theo ma don, ten khach, sdt..."
+                placeholder="Tìm theo mã đơn, tên khách, sđt..."
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
               />
             </label>
@@ -309,10 +327,10 @@ export const AdminOrders = () => {
             <Truck size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Khong tim thay don nao
+            Không tìm thấy đơn nào
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Thu doi tu khoa tim kiem hoac bo loc trang thai.
+            Thử đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái.
           </p>
         </section>
       ) : (
@@ -341,18 +359,23 @@ export const AdminOrders = () => {
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                       {getPaymentLabel(order.paymentMethod)}
                     </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}
+                    >
+                      {getPaymentStatusLabel(order.paymentStatus)}
+                    </span>
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Khach hang
+                        Khách hàng
                       </div>
                       <div className="mt-1 font-semibold text-slate-950">
                         {order.customerName}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {order.customerPhone || "Khong co so dien thoai"}
+                        {order.customerPhone || "Không có số điện thoại"}
                       </div>
                     </div>
 
@@ -367,7 +390,7 @@ export const AdminOrders = () => {
 
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Tao luc
+                        Tạo lúc
                       </div>
                       <div className="mt-1 text-sm font-medium text-slate-700">
                         {formatDateTime(order.createdAt)}
@@ -395,13 +418,13 @@ export const AdminOrders = () => {
                 <div className="w-full xl:w-[260px]">
                   <div className="rounded-[24px] bg-slate-950 p-5 text-white">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Tong don
+                      Tổng đơn
                     </div>
                     <div className="mt-2 font-display text-3xl font-black">
                       {formatPriceAdmin(order.totalPrice)}
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
-                      {(order.items || []).length} mon • {getPaymentLabel(order.paymentMethod)}
+                      {(order.items || []).length} mon - {getPaymentLabel(order.paymentMethod)}
                     </div>
                   </div>
 
@@ -411,7 +434,7 @@ export const AdminOrders = () => {
                       onClick={() => setSelectedOrder(order)}
                       className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
-                      Xem chi tiet
+                      Xem chi tiết
                     </button>
 
                     {canConfirmOrder(order.orderStatus) ? (
@@ -426,7 +449,7 @@ export const AdminOrders = () => {
                         ) : (
                           <Check size={16} />
                         )}
-                        Xac nhan va chuyen xu ly
+                        {getConfirmActionLabel(order)}
                       </button>
                     ) : null}
 
@@ -442,7 +465,7 @@ export const AdminOrders = () => {
                         ) : (
                           <X size={16} />
                         )}
-                        Huy don
+                        Hủy đơn
                       </button>
                     ) : null}
                   </div>

@@ -7,7 +7,8 @@ const CACHE_TTL = 5 * 60 * 1000;
 let productsCache = null;
 let productsCacheTime = 0;
 
-const USE_DATABASE_ONLY = import.meta.env?.VITE_USE_DATABASE_ONLY === "true";
+const USE_DATABASE_ONLY =
+  import.meta.env?.VITE_USE_DATABASE_ONLY === "true" || import.meta.env?.PROD;
 
 const hasQueryFilters = (query = {}) =>
   Object.values(query || {}).some(
@@ -190,7 +191,7 @@ export const getProductById = async (productId) => {
   try {
     const response = await axios.get(buildApiUrl(`/products/${productId}`));
     return normalizeProduct(response.data || {});
-  } catch (error) {
+  } catch {
     const products = await getProducts();
     return (
       products.find((product) => String(product.id) === String(productId)) || null

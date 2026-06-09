@@ -2,14 +2,139 @@ import mongoose from "mongoose";
 import Order, {
   EOrderStatus,
   EPaymentMethod,
+  EPaymentStatus,
 } from "../models/Order.js";
+import Product from "../models/Product.js";
 import Voucher from "../models/Voucher.js";
 import { createZaloPayOrder } from "../config/zalopay.js";
 import { calculateVoucherForItems } from "./voucherController.js";
+import { normalizeFulfillmentPayload } from "../utils/menuDomain.js";
 import {
-  normalizeFulfillmentPayload,
-  normalizeOrderItem,
-} from "../utils/menuDomain.js";
+  buildVoucherPricingItems,
+  priceOrderItemsFromProducts,
+} from "../utils/orderPricing.js";
+import {
+  canCancelOrder,
+  canCompleteOrder,
+  canRequestRefund,
+  getAdminOrderActionLabel,
+  getAdminOrderAdvance,
+  isPaymentExpired,
+  PAYMENT_EXPIRY_MINUTES,
+} from "../utils/orderWorkflow.js";
+import { consumeOrderCartItems } from "../services/orderCartSync.js";
+
+const getProductIdsFromItems = (items = []) =>
+  [
+    ...new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => String(item.productId || item.id || item._id || ""))
+        .filter((productId) => mongoose.isValidObjectId(productId))
+    ),
+  ];
+
+const loadProductsForOrderItems = async (items = []) => {
+  const productIds = getProductIdsFromItems(items);
+  if (productIds.length === 0) return [];
+  return Product.find({ _id: { $in: productIds } }).lean();
+};
+
+const releaseInventoryForItems = async (items = []) => {
+  const writes = (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity || 0),
+    }))
+    .filter(
+      (item) => mongoose.isValidObjectId(item.productId) && item.quantity > 0
+    )
+    .map((item) => ({
+      updateOne: {
+        filter: { _id: item.productId },
+        update: {
+          $inc: {
+            stock: item.quantity,
+            soldCount: -item.quantity,
+          },
+        },
+      },
+    }));
+
+  if (writes.length > 0) {
+    await Product.bulkWrite(writes);
+  }
+};
+
+const reserveInventoryForItems = async (items = []) => {
+  const reservedItems = [];
+
+  for (const item of items) {
+    const result = await Product.updateOne(
+      {
+        _id: item.productId,
+        stock: { $gte: item.quantity },
+        isActive: { $ne: false },
+        isAvailable: { $ne: false },
+      },
+      {
+        $inc: {
+          stock: -item.quantity,
+          soldCount: item.quantity,
+        },
+      }
+    );
+
+    if (result.modifiedCount !== 1) {
+      await releaseInventoryForItems(reservedItems);
+      throw new Error(
+        `Product ${item.productName || item.productId} has not enough stock`
+      );
+    }
+
+    reservedItems.push(item);
+  }
+};
+
+const countVoucherUsage = async (order) => {
+  if (!order?.voucherId || order.voucherUsageCounted) return;
+  await Voucher.findByIdAndUpdate(order.voucherId, { $inc: { usedCount: 1 } });
+  order.voucherUsageCounted = true;
+};
+
+const releaseVoucherUsage = async (order) => {
+  if (!order?.voucherId || !order.voucherUsageCounted) return;
+  await Voucher.findByIdAndUpdate(order.voucherId, {
+    $inc: { usedCount: -1 },
+  });
+  order.voucherUsageCounted = false;
+};
+
+const releaseOrderReservations = async (order) => {
+  if (!order || !order.stockReserved || order.stockReleased) return;
+  await releaseInventoryForItems(order.items || []);
+  order.stockReleased = true;
+};
+
+const expireStalePaymentOrders = async () => {
+  const cutoff = new Date(Date.now() - PAYMENT_EXPIRY_MINUTES * 60 * 1000);
+  const staleOrders = await Order.find({
+    orderStatus: EOrderStatus.WaitingForPayment,
+    paymentStatus: EPaymentStatus.Waiting,
+    createdAt: { $lt: cutoff },
+  });
+
+  for (const order of staleOrders) {
+    if (!isPaymentExpired(order)) continue;
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
+    order.orderStatus = EOrderStatus.Cancelled;
+    order.paymentStatus = EPaymentStatus.Failed;
+    order.note = [order.note, "Auto-cancelled because online payment expired."]
+      .filter(Boolean)
+      .join("\n");
+    await order.save();
+  }
+};
 
 export const createOrder = async (req, res) => {
   try {
@@ -40,16 +165,8 @@ export const createOrder = async (req, res) => {
 
     const fulfillment = normalizeFulfillmentPayload(req.body || {});
 
-    const normalizedItems = items.map((item) => {
-      const normalized = normalizeOrderItem(item);
-      if (!normalized.productId || !mongoose.isValidObjectId(normalized.productId)) {
-        throw new Error("Invalid productId in items");
-      }
-      if (!normalized.productName) {
-        throw new Error("productName is required in items");
-      }
-      return normalized;
-    });
+    const products = await loadProductsForOrderItems(items);
+    const normalizedItems = priceOrderItemsFromProducts(items, products);
 
     const itemsSubtotal = normalizedItems.reduce(
       (sum, item) => sum + item.lineTotal,
@@ -66,12 +183,7 @@ export const createOrder = async (req, res) => {
       const voucherResult = await calculateVoucherForItems({
         userId: customerId,
         code: voucherCode,
-        items: normalizedItems.map((item) => ({
-          productId: item.productId,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          lineTotal: item.lineTotal,
-        })),
+        items: buildVoucherPricingItems(normalizedItems),
         orderTotal: originalTotalPrice,
         deliveryFee: fulfillment.deliveryFee,
         fulfillmentType: fulfillment.fulfillmentType,
@@ -99,6 +211,10 @@ export const createOrder = async (req, res) => {
       resolvedPaymentMethod === EPaymentMethod.Zalopay
         ? EOrderStatus.WaitingForPayment
         : EOrderStatus.Pending;
+    const paymentStatus =
+      resolvedPaymentMethod === EPaymentMethod.Zalopay
+        ? EPaymentStatus.Waiting
+        : EPaymentStatus.Unpaid;
 
     if (resolvedPaymentMethod === EPaymentMethod.Zalopay) {
       try {
@@ -129,43 +245,62 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    const order = await Order.create({
-      customerId,
-      customerName,
-      customerPhone,
-      customerEmail,
-      items: normalizedItems,
-      orderStatus,
-      paymentMethod: resolvedPaymentMethod,
-      fulfillmentType: fulfillment.fulfillmentType,
-      shippingAddress: fulfillment.shippingAddress,
-      pickupTime: fulfillment.pickupTime,
-      tableBooking: fulfillment.tableBooking,
-      note,
-      deliveryFee: fulfillment.deliveryFee,
-      totalPrice: finalTotalPrice,
-      originalTotalPrice,
-      discountAmount,
-      voucherCode: appliedVoucherCode,
-      voucherId: appliedVoucherId,
-      zaloPayAppTransId,
-    });
+    await reserveInventoryForItems(normalizedItems);
 
-    if (appliedVoucherId) {
+    let order;
+    try {
+      order = await Order.create({
+        customerId,
+        customerName,
+        customerPhone,
+        customerEmail,
+        items: normalizedItems,
+        orderStatus,
+        paymentStatus,
+        paymentMethod: resolvedPaymentMethod,
+        fulfillmentType: fulfillment.fulfillmentType,
+        shippingAddress: fulfillment.shippingAddress,
+        pickupTime: fulfillment.pickupTime,
+        tableBooking: fulfillment.tableBooking,
+        note,
+        deliveryFee: fulfillment.deliveryFee,
+        totalPrice: finalTotalPrice,
+        originalTotalPrice,
+        discountAmount,
+        voucherCode: appliedVoucherCode,
+        voucherId: appliedVoucherId,
+        zaloPayAppTransId,
+        stockReserved: true,
+      });
+    } catch (createErr) {
+      await releaseInventoryForItems(normalizedItems);
+      throw createErr;
+    }
+
+    if (appliedVoucherId && resolvedPaymentMethod !== EPaymentMethod.Zalopay) {
       try {
-        await Voucher.findByIdAndUpdate(appliedVoucherId, {
-          $inc: { usedCount: 1 },
-        });
+        await countVoucherUsage(order);
+        await order.save();
       } catch (usageErr) {
         console.error("Failed to increment voucher usedCount", usageErr);
       }
     }
 
-    return res.status(201).json({ order, paymentData });
+    let syncedCart = null;
+    if (resolvedPaymentMethod !== EPaymentMethod.Zalopay) {
+      const syncResult = await consumeOrderCartItems(order);
+      syncedCart = syncResult.cart;
+    }
+
+    return res.status(201).json({ order, paymentData, cart: syncedCart });
   } catch (err) {
     const message = err?.message || "Server error";
     if (
       message.includes("Invalid") ||
+      message.includes("not found") ||
+      message.includes("not available") ||
+      message.includes("stock") ||
+      message.includes("exceeds") ||
       message.includes("required") ||
       message.includes("Missing") ||
       message.includes("Unsupported")
@@ -184,6 +319,8 @@ export const getMyOrders = async (req, res) => {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
+    await expireStalePaymentOrders();
+
     const orders = await Order.find({ customerId })
       .sort({ createdAt: -1 })
       .lean();
@@ -196,8 +333,22 @@ export const getMyOrders = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 }).lean();
-    return res.json({ orders });
+    await expireStalePaymentOrders();
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+    const [orders, total] = await Promise.all([
+      Order.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Order.countDocuments({}),
+    ]);
+
+    return res.json({
+      orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 0,
+    });
   } catch (err) {
     console.error("getAllOrders error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -217,7 +368,7 @@ export const getOrderStats = async (req, res) => {
     let endDate = to ? new Date(to) : new Date();
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ message: "Tham so thoi gian khong hop le." });
+      return res.status(400).json({ message: "Tham số thời gian không hợp lệ." });
     }
 
     if (startDate < minStart) startDate = minStart;
@@ -298,7 +449,7 @@ export const getOrderStats = async (req, res) => {
     console.error("getOrderStats error", err);
     return res
       .status(500)
-      .json({ message: "Loi server khi lay thong ke don hang." });
+      .json({ message: "Lỗi server khi lấy thống kê đơn hàng." });
   }
 };
 
@@ -318,11 +469,18 @@ export const cancelOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
-    if (order.orderStatus === EOrderStatus.Cancelled) {
-      return res.status(400).json({ message: "Order already cancelled" });
+    if (!canCancelOrder(order.orderStatus)) {
+      return res.status(400).json({ message: "Order cannot be cancelled at this stage" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Cancelled;
+    if (order.paymentStatus === EPaymentStatus.Waiting) {
+      order.paymentStatus = EPaymentStatus.Failed;
+    } else if (order.paymentStatus === EPaymentStatus.Paid) {
+      order.paymentStatus = EPaymentStatus.Refunded;
+    }
     await order.save();
 
     return res.json({ order });
@@ -345,20 +503,35 @@ export const confirmOrderByAdmin = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (
-      ![EOrderStatus.Pending, EOrderStatus.Confirmed].includes(order.orderStatus)
-    ) {
+    const nextStatus = getAdminOrderAdvance(
+      order.orderStatus,
+      order.fulfillmentType
+    );
+    const actionLabel = getAdminOrderActionLabel(
+      order.orderStatus,
+      order.fulfillmentType
+    );
+
+    if (!nextStatus) {
       return res
         .status(400)
-        .json({ message: "Khong the xac nhan don hang o trang thai nay" });
+        .json({ message: "Không thể cập nhật đơn hàng ở trạng thái này" });
     }
 
-    order.orderStatus = EOrderStatus.Shipping;
+    order.orderStatus = nextStatus;
+    if (
+      nextStatus === EOrderStatus.Confirmed &&
+      order.paymentMethod === EPaymentMethod.Cash
+    ) {
+      order.paymentStatus = EPaymentStatus.Paid;
+    }
     await order.save();
 
     return res.json({
       order,
-      message: "Don hang da duoc xac nhan va dang duoc xu ly",
+      message: actionLabel
+        ? `${actionLabel} thành công`
+        : "Đã cập nhật trạng thái đơn hàng",
     });
   } catch (err) {
     console.error("confirmOrderByAdmin error:", err);
@@ -379,14 +552,21 @@ export const cancelOrderByAdmin = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus === EOrderStatus.Cancelled) {
-      return res.status(400).json({ message: "Don hang da bi huy roi" });
+    if ([EOrderStatus.Cancelled, EOrderStatus.Confirmed, EOrderStatus.Refunded].includes(order.orderStatus)) {
+      return res.status(400).json({ message: "Đơn hàng đã bị hủy rồi" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Cancelled;
+    if (order.paymentStatus === EPaymentStatus.Paid) {
+      order.paymentStatus = EPaymentStatus.Refunded;
+    } else if (order.paymentStatus === EPaymentStatus.Waiting) {
+      order.paymentStatus = EPaymentStatus.Failed;
+    }
     await order.save();
 
-    return res.json({ order, message: "Don hang da duoc huy" });
+    return res.json({ order, message: "Đơn hàng đã được hủy" });
   } catch (err) {
     console.error("cancelOrderByAdmin error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -410,16 +590,19 @@ export const receiveOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus !== EOrderStatus.Shipping) {
+    if (!canCompleteOrder(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
-        .json({ message: "Chi co the hoan tat khi don dang duoc xu ly" });
+        .json({ message: "Chỉ có thể hoàn tất khi đơn đang được xử lý" });
     }
 
     order.orderStatus = EOrderStatus.Confirmed;
+    if (order.paymentMethod === EPaymentMethod.Cash) {
+      order.paymentStatus = EPaymentStatus.Paid;
+    }
     await order.save();
 
-    return res.json({ order, message: "Da xac nhan hoan tat don hang" });
+    return res.json({ order, message: "Đã xác nhận hoàn tất đơn hàng" });
   } catch (err) {
     console.error("receiveOrder error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -443,16 +626,19 @@ export const refundOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.orderStatus !== EOrderStatus.Shipping) {
+    if (!canRequestRefund(order.orderStatus, order.fulfillmentType)) {
       return res
         .status(400)
-        .json({ message: "Chi co the yeu cau hoan tien khi don dang xu ly" });
+        .json({ message: "Chỉ có thể yêu cầu hoàn tiền khi đơn đang xử lý" });
     }
 
+    await releaseOrderReservations(order);
+    await releaseVoucherUsage(order);
     order.orderStatus = EOrderStatus.Refunded;
+    order.paymentStatus = EPaymentStatus.Refunded;
     await order.save();
 
-    return res.json({ order, message: "Da yeu cau hoan tien thanh cong" });
+    return res.json({ order, message: "Đã yêu cầu hoàn tiền thành công" });
   } catch (err) {
     console.error("refundOrder error:", err);
     return res.status(500).json({ message: "Server error" });

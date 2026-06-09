@@ -66,3 +66,36 @@ export const updateCartItemQuantity = (items = [], cartKey, quantity) => {
 
 export const removeCartItem = (items = [], cartKey) =>
   items.filter((item) => normalizeCartKey(item.cartKey) !== normalizeCartKey(cartKey));
+
+export const consumePurchasedCartItems = (items = [], purchasedItems = []) => {
+  const purchasedQuantityByKey = new Map();
+
+  for (const item of Array.isArray(purchasedItems) ? purchasedItems : []) {
+    const cartKey = normalizeCartKey(item?.cartKey);
+    const quantity = Number(item?.quantity);
+    if (!cartKey || !Number.isFinite(quantity) || quantity <= 0) continue;
+
+    purchasedQuantityByKey.set(
+      cartKey,
+      (purchasedQuantityByKey.get(cartKey) || 0) + quantity
+    );
+  }
+
+  return (Array.isArray(items) ? items : []).flatMap((item) => {
+    const cartKey = normalizeCartKey(item?.cartKey);
+    const purchasedQuantity = purchasedQuantityByKey.get(cartKey) || 0;
+    if (purchasedQuantity <= 0) return [item];
+
+    const currentQuantity = Number(item?.quantity) || 0;
+    const remainingQuantity = currentQuantity - purchasedQuantity;
+    if (remainingQuantity <= 0) return [];
+
+    return [
+      {
+        ...item,
+        quantity: remainingQuantity,
+        lineTotal: (Number(item?.unitPrice) || 0) * remainingQuantity,
+      },
+    ];
+  });
+};

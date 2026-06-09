@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   adminEndSupport,
   adminJoinSupport,
@@ -20,7 +20,20 @@ export default function AdminChat() {
   const [supportChanging, setSupportChanging] = useState(false);
   const pollIntervalRef = useRef(null);
 
-  const loadConversations = async (options = {}) => {
+  const loadMessages = useCallback(async (userId) => {
+    if (!userId) return;
+    setLoadingMessages(true);
+    try {
+      const data = await fetchChatHistoryForAdmin(userId);
+      setMessages(data);
+    } catch (err) {
+      console.error("Failed to load messages for admin", err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, []);
+
+  const loadConversations = useCallback(async (options = {}) => {
     setLoadingConversations(true);
     try {
       const data = await fetchConversationsForAdmin();
@@ -32,31 +45,21 @@ export default function AdminChat() {
           setSelectedUserInfo(matched);
         }
       } else if (!selectedUserId && data.length > 0) {
-        handleSelectUser(data[0]);
+        const firstConversation = data[0];
+        setSelectedUserId(firstConversation.userId);
+        setSelectedUserInfo(firstConversation);
+        loadMessages(firstConversation.userId);
       }
     } catch (err) {
       console.error("Failed to load conversations", err);
     } finally {
       setLoadingConversations(false);
     }
-  };
-
-  const loadMessages = async (userId) => {
-    if (!userId) return;
-    setLoadingMessages(true);
-    try {
-      const data = await fetchChatHistoryForAdmin(userId);
-      setMessages(data);
-    } catch (err) {
-      console.error("Failed to load messages for admin", err);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
+  }, [loadMessages, selectedUserId]);
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     if (!selectedUserId) {
@@ -84,13 +87,13 @@ export default function AdminChat() {
         pollIntervalRef.current = null;
       }
     };
-  }, [selectedUserId]);
+  }, [loadConversations, loadMessages, selectedUserId]);
 
-  const handleSelectUser = (conversation) => {
+  const handleSelectUser = useCallback((conversation) => {
     setSelectedUserId(conversation.userId);
     setSelectedUserInfo(conversation);
     loadMessages(conversation.userId);
-  };
+  }, [loadMessages]);
 
   const handleJoinSupport = async () => {
     if (!selectedUserId || supportChanging) return;
@@ -160,7 +163,7 @@ export default function AdminChat() {
           <div className="space-y-3 border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_70%)] p-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Ho tro khach hang
+                Hỗ trợ khách hàng
               </div>
               <h2 className="mt-1 font-display text-2xl font-black text-slate-950">
                 Live chat
@@ -168,20 +171,20 @@ export default function AdminChat() {
             </div>
 
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">Khach hang</h3>
+              <h3 className="font-semibold text-slate-900">Khách hàng</h3>
               <button
                 type="button"
                 onClick={loadConversations}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
               >
-                Lam moi
+                Làm mới
               </button>
             </div>
 
             <input
               type="text"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-              placeholder="Tim theo ten / email..."
+              placeholder="Tìm theo tên / email..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -189,7 +192,7 @@ export default function AdminChat() {
 
           <div className="flex-1 overflow-y-auto bg-white">
             {loadingConversations && (
-              <div className="p-4 text-sm text-slate-400">Dang tai hoi thoai...</div>
+              <div className="p-4 text-sm text-slate-400">Đang tải hội thoại...</div>
             )}
 
             {filteredConversations.map((conversation) => (
@@ -203,17 +206,29 @@ export default function AdminChat() {
                     : "bg-white"
                 }`}
               >
-                <div className="font-semibold text-slate-900">
-                  {conversation.fullname ||
-                    conversation.username ||
-                    conversation.email ||
-                    conversation.userId}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 truncate font-semibold text-slate-900">
+                    {conversation.fullname ||
+                      conversation.username ||
+                      conversation.email ||
+                      conversation.userId}
+                  </div>
+                  {conversation.unreadCount > 0 ? (
+                    <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      {conversation.unreadCount}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-1 truncate text-xs text-slate-500">
                   {conversation.lastRole === "user" ? "KH: " : "Admin: "}
                   {conversation.lastMessage}
                 </div>
                 <div className="mt-2 space-y-1 text-[11px] text-slate-400">
+                  {conversation.lastOrderCode ? (
+                    <div className="font-semibold text-orange-600">
+                      Đơn #{conversation.lastOrderCode}
+                    </div>
+                  ) : null}
                   <div>
                     {conversation.lastAt
                       ? new Date(conversation.lastAt).toLocaleString()
@@ -225,8 +240,8 @@ export default function AdminChat() {
                         conversation.isHandledByMe ? "text-emerald-600" : ""
                       }
                     >
-                      Dang duoc ho tro boi: {conversation.currentAdminName}
-                      {conversation.isHandledByMe && " (ban)"}
+                      Đang được hỗ trợ bởi: {conversation.currentAdminName}
+                      {conversation.isHandledByMe && " (bạn)"}
                     </div>
                   ) : conversation.lastAdminName ? (
                     <div>Admin gan nhat: {conversation.lastAdminName}</div>
@@ -236,7 +251,7 @@ export default function AdminChat() {
             ))}
 
             {!loadingConversations && conversations.length === 0 && (
-              <div className="p-4 text-sm text-slate-400">Chua co hoi thoai nao.</div>
+              <div className="p-4 text-sm text-slate-400">Chưa có hội thoại nào.</div>
             )}
           </div>
         </div>
@@ -255,10 +270,15 @@ export default function AdminChat() {
                   <div className="text-xs text-slate-500">
                     ID: {selectedUserInfo.userId}
                   </div>
+                  {selectedUserInfo.lastOrderCode ? (
+                    <div className="mt-1 text-xs font-semibold text-orange-600">
+                      Đang có câu hỏi về đơn #{selectedUserInfo.lastOrderCode}
+                    </div>
+                  ) : null}
                   {selectedUserInfo.currentAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
-                      Dang duoc ho tro boi: {selectedUserInfo.currentAdminName}
-                      {selectedUserInfo.isHandledByMe && " (ban)"}
+                      Đang được hỗ trợ bởi: {selectedUserInfo.currentAdminName}
+                      {selectedUserInfo.isHandledByMe && " (bạn)"}
                     </div>
                   ) : selectedUserInfo.lastAdminName ? (
                     <div className="mt-1 text-xs text-slate-500">
@@ -291,14 +311,14 @@ export default function AdminChat() {
               </>
             ) : (
               <div className="text-sm text-slate-400">
-                Chon mot khach hang de xem hoi thoai.
+                Chọn một khách hàng để xem hội thoại.
               </div>
             )}
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50/80 px-4 py-4 text-sm">
             {loadingMessages && (
-              <div className="text-xs text-slate-400">Dang tai tin nhan...</div>
+              <div className="text-xs text-slate-400">Đang tải tin nhắn...</div>
             )}
 
             {messages.map((message) => (
@@ -315,13 +335,18 @@ export default function AdminChat() {
                       : "rounded-br-md bg-gradient-to-r from-orange-500 to-rose-500 text-white"
                   }`}
                 >
+                  {message.orderCode ? (
+                    <div className="mb-1 text-[10px] font-semibold uppercase opacity-75">
+                      Đơn #{message.orderCode}
+                    </div>
+                  ) : null}
                   {message.content}
                 </div>
               </div>
             ))}
 
             {!loadingMessages && messages.length === 0 && selectedUserId && (
-              <div className="text-xs text-slate-400">Chua co tin nhan nao.</div>
+              <div className="text-xs text-slate-400">Chưa có tin nhắn nào.</div>
             )}
           </div>
 
@@ -332,8 +357,8 @@ export default function AdminChat() {
                 className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
                 placeholder={
                   selectedUserId
-                    ? "Nhap noi dung tra loi..."
-                    : "Chon mot khach hang de bat dau chat"
+                    ? "Nhập nội dung trả lời..."
+                    : "Chọn một khách hàng để bắt đầu chat"
                 }
                 value={input}
                 onChange={(event) => setInput(event.target.value)}

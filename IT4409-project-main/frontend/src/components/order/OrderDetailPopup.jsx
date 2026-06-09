@@ -11,19 +11,19 @@ const formatPrice = (value = 0) =>
   }).format(Number(value || 0));
 
 const statusLabelMap = {
-  waiting_for_payment: "Cho thanh toan",
-  pending: "Cho xu ly",
-  paid: "Da thanh toan",
-  confirmed: "Hoan tat",
-  shipping: "Dang phuc vu",
-  cancelled: "Da huy",
-  refunded: "Da hoan tien",
+  waiting_for_payment: "Chờ thanh toán",
+  pending: "Chờ xử lý",
+  paid: "Đã thanh toán",
+  confirmed: "Hoàn tất",
+  shipping: "Đang phục vụ",
+  cancelled: "Đã hủy",
+  refunded: "Đã hoàn tiền",
 };
 
 const fulfillmentLabelMap = {
-  delivery: "Giao hang",
-  pickup: "Tu den lay",
-  dine_in: "Dat ban",
+  delivery: "Giao hàng",
+  pickup: "Tự đến lấy",
+  dine_in: "Đặt bàn",
 };
 
 const formatDateTime = (value) => {
@@ -43,17 +43,17 @@ const formatDateTime = (value) => {
 const getFulfillmentDetail = (order) => {
   if (order.fulfillmentType === "pickup") {
     return order.pickupTime
-      ? `Lay mon luc ${formatDateTime(order.pickupTime)}`
-      : "Khach tu den lay tai quay";
+      ? `Lấy món lúc ${formatDateTime(order.pickupTime)}`
+      : "Khách tự đến lấy tại quầy";
   }
 
   if (order.fulfillmentType === "dine_in") {
-    return `${order.tableBooking?.guestCount || 0} khach • ${formatDateTime(
+    return `${order.tableBooking?.guestCount || 0} khách • ${formatDateTime(
       order.tableBooking?.bookingTime
     )}`;
   }
 
-  return order.shippingAddress || "Chua co dia chi giao hang";
+  return order.shippingAddress || "Chưa có địa chỉ giao hàng";
 };
 
 export default function OrderDetailPopup({ order, onClose, onCancel }) {
@@ -69,7 +69,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
       );
       onCancel(order._id);
     } catch (err) {
-      console.error("Khong the huy don hang:", err);
+      console.error("Không thể hủy đơn hàng:", err);
     }
   };
 
@@ -91,7 +91,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
                 Order #{String(order._id || "").slice(-8).toUpperCase()}
               </div>
               <h2 className="mt-3 font-display text-2xl font-black text-slate-950">
-                Chi tiet don hang
+                Chi tiết đơn hàng
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {statusLabelMap[order.orderStatus] || order.orderStatus} •{" "}
@@ -114,7 +114,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
               <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <FiPhone className="text-orange-500" />
-                  Khach hang
+                  Khách hàng
                 </div>
                 <div className="mt-3 space-y-2 text-sm text-slate-600">
                   <div className="font-semibold text-slate-900">
@@ -127,7 +127,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
               <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <FiMapPin className="text-orange-500" />
-                  Nhan mon
+                  Nhận món
                 </div>
                 <div className="mt-3 text-sm leading-6 text-slate-600">
                   {getFulfillmentDetail(order)}
@@ -137,7 +137,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
 
             <div className="rounded-[24px] border border-slate-100 bg-white">
               <div className="border-b border-slate-100 px-5 py-4 text-sm font-semibold text-slate-900">
-                Mon da dat
+                Món đã đặt
               </div>
               <div className="space-y-3 p-5">
                 {(order.items || []).map((item, index) => {
@@ -172,7 +172,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
                               {item.productName}
                             </div>
                             <div className="mt-1 text-sm text-slate-500">
-                              So luong: {item.quantity}
+                              Số lượng: {item.quantity}
                             </div>
                           </div>
                           <div className="text-sm font-semibold text-slate-900">
@@ -199,7 +199,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
 
                         {item.itemNote ? (
                           <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-2 text-sm text-slate-500">
-                            Ghi chu: {item.itemNote}
+                            Ghi chú: {item.itemNote}
                           </div>
                         ) : null}
                       </div>
@@ -214,12 +214,12 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
             <div className="rounded-[24px] border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <FiClock className="text-orange-500" />
-                Thoi gian va thanh toan
+                Thời gian và thanh toán
               </div>
               <div className="mt-4 space-y-3 text-sm text-slate-600">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Tao don
+                    Tạo đơn
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {formatDateTime(order.createdAt)}
@@ -227,15 +227,15 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Thanh toan
+                    Thanh toán
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
-                    {order.paymentMethod === "zalopay" ? "ZaloPay" : "Tien mat"}
+                    {order.paymentMethod === "zalopay" ? "ZaloPay" : "Tiền mặt"}
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-950 px-4 py-4 text-white">
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Tong cong
+                    Tổng cộng
                   </div>
                   <div className="mt-1 font-display text-2xl font-black">
                     {formatPrice(order.totalPrice)}
@@ -247,10 +247,10 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
             <div className="rounded-[24px] border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <FiPackage className="text-orange-500" />
-                Ghi chu don hang
+                Ghi chú đơn hàng
               </div>
               <div className="mt-4 text-sm leading-6 text-slate-500">
-                {order.note || "Khong co ghi chu them cho don nay."}
+                {order.note || "Không có ghi chú thêm cho đơn này."}
               </div>
             </div>
 
@@ -260,7 +260,7 @@ export default function OrderDetailPopup({ order, onClose, onCancel }) {
                 onClick={handleCancelOrder}
                 className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100"
               >
-                Huy don hang
+                Hủy đơn hàng
               </button>
             )}
           </div>

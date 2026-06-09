@@ -9,7 +9,8 @@ export const normalizeCategory = (category = {}) => ({
   image: category.icon || category.image || "",
 });
 
-const USE_DATABASE_ONLY = import.meta.env?.VITE_USE_DATABASE_ONLY === "true";
+const USE_DATABASE_ONLY =
+  import.meta.env?.VITE_USE_DATABASE_ONLY === "true" || import.meta.env?.PROD;
 
 export const getCategories = async () => {
   try {

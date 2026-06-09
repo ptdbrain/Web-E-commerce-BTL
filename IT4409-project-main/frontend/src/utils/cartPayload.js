@@ -32,7 +32,11 @@ export const buildCartApiItemPayload = (item = {}) => ({
   itemNote: String(item.itemNote || item.note || "").trim(),
 });
 
-export const buildOrderItemPayload = (item = {}) => ({
+export const buildOrderItemPayload = (
+  item = {},
+  { includeCartKey = true } = {}
+) => ({
+  ...(includeCartKey && item.cartKey ? { cartKey: item.cartKey } : {}),
   productId: item.id || item.productId,
   productName: item.name || item.productName || "",
   productImage: item.imageUrl || item.image || item.thumbnail || "",
@@ -57,6 +61,8 @@ export const buildVoucherItemPayload = (item = {}) => {
     quantity,
     unitPrice,
     lineTotal: unitPrice * quantity,
+    selectedSize: item.selectedSize || null,
+    selectedAddons: normalizeAddons(item.selectedAddons || []),
   };
 };
 

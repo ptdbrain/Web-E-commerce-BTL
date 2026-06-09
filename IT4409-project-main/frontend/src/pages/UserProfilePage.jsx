@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FiEdit2, FiCamera, FiLock, FiX, FiCheck, FiUser, FiMail, FiPhone, FiMapPin } from "react-icons/fi";
@@ -33,7 +33,7 @@ export default function UserProfilePage() {
     return "";
   };
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -50,7 +50,9 @@ export default function UserProfilePage() {
           localStorage.removeItem("token");
           delete axios.defaults.headers.common["Authorization"];
           window.dispatchEvent(new Event("authChanged"));
-        } catch (e) {}
+        } catch {
+          console.warn("Failed to clear stale auth state");
+        }
         setError("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
         navigate("/login");
       } else {
@@ -59,11 +61,11 @@ export default function UserProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [loadProfile]);
 
   const startEdit = (fieldKey) => {
     let currentValue = "";

@@ -36,7 +36,7 @@ export default function Dashboard() {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(buildApiUrl("/orders"), {
+      const response = await axios.get(buildApiUrl("/orders?limit=200"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setOrders(Array.isArray(response.data?.orders) ? response.data.orders : []);
@@ -44,7 +44,7 @@ export default function Dashboard() {
       console.error("Failed to load dashboard orders", err);
       setOrders([]);
       setOrdersError(
-        err?.response?.data?.message || "Khong the tai so lieu don hang."
+        err?.response?.data?.message || "Không thể tải số liệu đơn hàng."
       );
     } finally {
       setLoadingOrders(false);
@@ -126,13 +126,13 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-100">
-              Tong quan van hanh
+              Tổng quan vận hành
             </div>
             <h2 className="mt-4 font-display text-3xl font-black tracking-tight">
               FireBite Performance
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Nhin nhanh doanh thu, don dang xu ly va ty trong delivery, pickup,
+              Nhìn nhanh doanh thu, đơn đang xử lý và tỷ trọng delivery, pickup,
               dine-in.
             </p>
           </div>
@@ -150,7 +150,7 @@ export default function Dashboard() {
               onClick={() => setSelectedMonth("")}
               className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/15"
             >
-              Tat ca thoi gian
+              Tất cả thời gian
             </button>
           </div>
         </div>
@@ -158,19 +158,19 @@ export default function Dashboard() {
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
             {
-              label: "Doanh thu hoan tat",
+              label: "Doanh thu hoàn tất",
               value: formatPriceAdmin(stats.revenue),
             },
             {
-              label: "Don dang xu ly",
+              label: "Đơn đang xử lý",
               value: stats.active,
             },
             {
-              label: "Ticket trung binh",
+              label: "Ticket trung bình",
               value: formatPriceAdmin(stats.averageTicket),
             },
             {
-              label: "Don hoan tat",
+              label: "Đơn hoàn tất",
               value: stats.completed,
             },
           ].map((card) => (
@@ -197,9 +197,9 @@ export default function Dashboard() {
         <section className="rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-slate-200/40 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-slate-950">Ty trong fulfillment</h3>
+              <h3 className="font-semibold text-slate-950">Tỷ trọng fulfillment</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Phan bo don theo cach nhan mon.
+                Phân bổ đơn theo cách nhận món.
               </p>
             </div>
             <button
@@ -207,7 +207,7 @@ export default function Dashboard() {
               onClick={loadOrders}
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Lam moi
+              Làm mới
             </button>
           </div>
 
@@ -225,7 +225,7 @@ export default function Dashboard() {
                       {getFulfillmentLabel(item.key)}
                     </span>
                     <span className="text-slate-500">
-                      {count} don • {percentage}%
+                      {count} đơn - {percentage}%
                     </span>
                   </div>
                   <div className="mt-2 h-3 rounded-full bg-slate-100">
@@ -242,7 +242,7 @@ export default function Dashboard() {
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Don hoan tien
+                Đơn hoàn tiền
               </div>
               <div className="mt-1 text-2xl font-bold text-slate-900">
                 {stats.refundCount}
@@ -250,7 +250,7 @@ export default function Dashboard() {
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Don da huy
+                Đơn đã hủy
               </div>
               <div className="mt-1 text-2xl font-bold text-slate-900">
                 {stats.cancelledCount}
@@ -262,13 +262,13 @@ export default function Dashboard() {
         <section className="rounded-[28px] border border-white/70 bg-white/85 p-5 shadow-xl shadow-slate-200/40 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-slate-950">Don gan nhat</h3>
+              <h3 className="font-semibold text-slate-950">Đơn gần nhất</h3>
               <p className="mt-1 text-sm text-slate-500">
-                Cap nhat theo bo loc thang hien tai.
+                Cập nhật theo bộ lọc tháng hiện tại.
               </p>
             </div>
             {loadingOrders ? (
-              <div className="text-sm text-slate-400">Dang tai...</div>
+              <div className="text-sm text-slate-400">Đang tải...</div>
             ) : null}
           </div>
 
@@ -295,7 +295,7 @@ export default function Dashboard() {
                         {order.customerName}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {getFulfillmentLabel(order.fulfillmentType)} •{" "}
+                        {getFulfillmentLabel(order.fulfillmentType)} -{" "}
                         {formatDateTime(order.createdAt)}
                       </div>
                     </div>
@@ -305,7 +305,7 @@ export default function Dashboard() {
                         {formatPriceAdmin(order.totalPrice)}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {(order.items || []).length} mon
+                        {(order.items || []).length} món
                       </div>
                     </div>
                   </div>
@@ -313,7 +313,7 @@ export default function Dashboard() {
               ))
             ) : (
               <div className="rounded-[24px] border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
-                Chua co don hang trong khoang thoi gian nay.
+                Chưa có đơn hàng trong khoảng thời gian này.
               </div>
             )}
           </div>

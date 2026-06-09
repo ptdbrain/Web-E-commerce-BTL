@@ -71,6 +71,7 @@ if (isProduction) {
   app.use(helmet());
 }
 
+app.set("trust proxy", 1);
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(sanitizeRequest);
@@ -84,21 +85,12 @@ const apiLimiter = rateLimit({
 
 app.use("/api", apiLimiter);
 
-if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
+if (!process.env.MONGO_URI || !process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
   console.error(
-    "Thieu bien moi truong (MONGO_URI hoac JWT_SECRET) trong file .env"
+    "Missing required environment variables: MONGO_URI, JWT_SECRET, JWT_REFRESH_SECRET"
   );
   process.exit(1);
 }
-
-mongoose.set("strictQuery", false);
-mongoose
-  .connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-    connectTimeoutMS: 10000,
-  })
-  .then(() => console.log("mongoose.connect() resolved"))
-  .catch((err) => console.error("mongoose.connect() failed:", err));
 
 mongoose.connection.on("connected", async () => {
   console.log("MongoDB connected");
@@ -110,12 +102,6 @@ mongoose.connection.on("error", (err) =>
 mongoose.connection.on("disconnected", () =>
   console.warn("MongoDB disconnected")
 );
-
-if (process.env.REDIS_URL && process.env.REDIS_URL.trim()) {
-  connectRedis();
-} else {
-  console.log("Redis disabled (REDIS_URL not set)");
-}
 
 app.get("/", (req, res) => {
   res.send("Backend API running");
@@ -130,7 +116,45 @@ app.use("/api", paymentRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", userRoutes);
 app.use("/api/reviews", reviewsRoutes);
+const PORT = process.env.PORT || 5000;
+
 app.use("/api", voucherRoutes);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.use((req, res) => {
+  res.status(404).json({ message: "API route not found" });
+});
+
+app.use((err, req, res, next) => {
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ message: "Image file is too large. Max size is 5MB." });
+  }
+  if (err?.code === "UNSUPPORTED_IMAGE_TYPE") {
+    return res.status(400).json({ message: err.message });
+  }
+
+  console.error("Unhandled API error:", err);
+  return res.status(500).json({ message: "Server error" });
+});
+
+const startServer = async () => {
+  try {
+    mongoose.set("strictQuery", false);
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+    });
+
+    if (process.env.REDIS_URL && process.env.REDIS_URL.trim()) {
+      await connectRedis();
+    } else {
+      console.log("Redis disabled (REDIS_URL not set)");
+    }
+
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
+};
+
+startServer();

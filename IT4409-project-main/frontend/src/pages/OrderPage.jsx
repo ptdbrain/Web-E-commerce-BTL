@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FiEye, FiPackage, FiRotateCcw } from "react-icons/fi";
+import { FiEye, FiMessageSquare, FiPackage, FiRotateCcw } from "react-icons/fi";
 import { buildApiUrl } from "../config/api";
 import OrderDetailPopup from "../components/order/OrderDetailPopup";
 import SEO from "../components/common/SEO";
@@ -8,6 +8,8 @@ import SEO from "../components/common/SEO";
 const getStatusStyle = (status) => {
   const map = {
     pending: "bg-amber-50 text-amber-700 border-amber-200",
+    preparing: "bg-orange-50 text-orange-700 border-orange-200",
+    ready: "bg-cyan-50 text-cyan-700 border-cyan-200",
     paid: "bg-blue-50 text-blue-700 border-blue-200",
     confirmed: "bg-emerald-50 text-emerald-700 border-emerald-200",
     shipping: "bg-violet-50 text-violet-700 border-violet-200",
@@ -29,6 +31,11 @@ const getStatusLabel = (status) => {
     waiting_for_payment: "Chờ thanh toán",
   };
   return map[status] || status;
+};
+
+const canCompleteOrder = (order) => {
+  if (order.fulfillmentType === "delivery") return order.orderStatus === "shipping";
+  return order.orderStatus === "ready";
 };
 
 export default function OrderPage() {
@@ -96,6 +103,17 @@ export default function OrderPage() {
     } catch (err) {
       alert(err?.response?.data?.message || "Không thể yêu cầu trả hàng");
     }
+  };
+
+  const handleAskAboutOrder = (order) => {
+    window.dispatchEvent(
+      new CustomEvent("openOrderChat", {
+        detail: {
+          orderId: order._id,
+          orderCode: order._id.slice(-8).toUpperCase(),
+        },
+      })
+    );
   };
 
   return (
@@ -179,7 +197,14 @@ export default function OrderPage() {
                     <FiEye size={13} />
                     Chi tiết
                   </button>
-                  {order.orderStatus === "shipping" && (
+                  <button
+                    onClick={() => handleAskAboutOrder(order)}
+                    className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100 transition-colors"
+                  >
+                    <FiMessageSquare size={13} />
+                    Hoi ve don
+                  </button>
+                  {canCompleteOrder(order) && (
                     <>
                       <button
                         onClick={() => handleReceiveOrder(order._id)}

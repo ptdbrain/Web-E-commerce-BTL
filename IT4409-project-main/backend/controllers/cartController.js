@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 
 import Cart from "../models/Cart.js";
-import { normalizeOrderItem } from "../utils/menuDomain.js";
+import Product from "../models/Product.js";
+import { priceOrderItemsFromProducts } from "../utils/orderPricing.js";
 import {
   buildCartKey,
   normalizeCartKey,
@@ -17,29 +18,42 @@ const emptyCartResponse = (userId) => ({
   items: [],
 });
 
-const buildCartItemSnapshot = (payload = {}) => {
-  const normalized = normalizeOrderItem(payload);
+const buildCartItemSnapshotFromPricedItem = (pricedItem = {}) => ({
+  cartKey: buildCartKey(pricedItem),
+  productId: pricedItem.productId,
+  productName: pricedItem.productName,
+  productImage: pricedItem.productImage,
+  quantity: pricedItem.quantity,
+  selectedSize: pricedItem.selectedSize,
+  selectedAddons: pricedItem.selectedAddons,
+  itemNote: pricedItem.itemNote,
+  basePrice: pricedItem.basePrice,
+  unitPrice: pricedItem.unitPrice,
+  lineTotal: pricedItem.lineTotal,
+});
 
-  if (!normalized.productId || !mongoose.isValidObjectId(normalized.productId)) {
+const buildCartItemSnapshot = async (payload = {}) => {
+  const productId = payload.productId || payload.id;
+  if (!productId || !mongoose.isValidObjectId(productId)) {
     throw new Error("Invalid productId in cart item");
   }
 
-  if (!normalized.productName) {
-    throw new Error("productName is required in cart item");
-  }
+  const product = await Product.findById(productId).lean();
+  const [pricedItem] = priceOrderItemsFromProducts([payload], product ? [product] : []);
+  return buildCartItemSnapshotFromPricedItem(pricedItem);
+};
 
+const refreshCartItemQuantity = async (cartItem, quantity) => {
+  const product = await Product.findById(cartItem.productId).lean();
+  const sourceItem =
+    typeof cartItem.toObject === "function" ? cartItem.toObject() : cartItem;
+  const [pricedItem] = priceOrderItemsFromProducts(
+    [{ ...sourceItem, quantity }],
+    product ? [product] : []
+  );
   return {
-    cartKey: normalizeCartKey(payload.cartKey) || buildCartKey(normalized),
-    productId: normalized.productId,
-    productName: normalized.productName,
-    productImage: normalized.productImage,
-    quantity: normalized.quantity,
-    selectedSize: normalized.selectedSize,
-    selectedAddons: normalized.selectedAddons,
-    itemNote: normalized.itemNote,
-    basePrice: normalized.basePrice,
-    unitPrice: normalized.unitPrice,
-    lineTotal: normalized.lineTotal,
+    ...buildCartItemSnapshotFromPricedItem(pricedItem),
+    cartKey: normalizeCartKey(cartItem.cartKey) || buildCartKey(pricedItem),
   };
 };
 
@@ -65,7 +79,7 @@ export const addCartItem = async (req, res) => {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    const cartItem = buildCartItemSnapshot(req.body || {});
+    const cartItem = await buildCartItemSnapshot(req.body || {});
     const cart = await Cart.findOne({ userId });
 
     if (!cart) {
@@ -110,10 +124,19 @@ export const updateCartItem = async (req, res) => {
       return res.status(404).json({ message: "Cart item not found" });
     }
 
-    cart.items = updateCartItemQuantity(
-      cart.items,
-      cartKey,
-      req.body?.quantity
+    const nextQuantity = Number(req.body?.quantity);
+    if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) {
+      cart.items = updateCartItemQuantity(cart.items, cartKey, nextQuantity);
+      await cart.save();
+      return res.json({ cart });
+    }
+
+    const existingItem = cart.items.find(
+      (item) => normalizeCartKey(item.cartKey) === cartKey
+    );
+    const refreshedItem = await refreshCartItemQuantity(existingItem, nextQuantity);
+    cart.items = cart.items.map((item) =>
+      normalizeCartKey(item.cartKey) === cartKey ? refreshedItem : item
     );
     await cart.save();
 

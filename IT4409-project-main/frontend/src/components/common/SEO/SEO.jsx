@@ -2,9 +2,9 @@ import { Helmet } from "react-helmet-async";
 import { storeConfig } from "../../../data/menuData";
 
 function SEO({
-  title = `${storeConfig.name} - Fast food ga gion, burger va combo`,
+  title = `${storeConfig.name} - Fast food gà giòn, burger và combo`,
   description = storeConfig.description,
-  keywords = "fast food, burger, ga ran, combo, do an nhanh, firebite",
+  keywords = "fast food, burger, gà rán, combo, đồ ăn nhanh, firebite",
   image = "/logo.png",
   url = typeof window !== "undefined" ? window.location.href : "",
 }) {

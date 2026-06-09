@@ -7,6 +7,11 @@ export const verifyCaptcha = async (req, res, next) => {
       return next();
     }
 
+    const secret = process.env.RECAPTCHA_SECRET;
+    if (!secret && process.env.NODE_ENV !== "production") {
+      return next();
+    }
+
     const { captchaToken } = req.body || {};
 
     if (!captchaToken) {
@@ -21,7 +26,7 @@ export const verifyCaptcha = async (req, res, next) => {
     if (!secret) {
       return res.status(500).json({
         success: false,
-        message: 'Captcha secret is not configured on server',
+        message: 'Internal Server Error', 
       });
     }
 
@@ -40,30 +45,31 @@ export const verifyCaptcha = async (req, res, next) => {
     const data = await response.json();
 
     if (!data.success) {
-      console.warn('reCAPTCHA verify failed:', data);
+
+      console.warn('reCAPTCHA verify failed:', data['error-codes']);
       return res.status(400).json({
         success: false,
         message: 'Invalid captcha',
-        errorCodes: data['error-codes'] || [],
       });
     }
 
-    const minScore = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.0');
+    const minScore = parseFloat(process.env.RECAPTCHA_MIN_SCORE || '0.5');
 
     if (typeof data.score === 'number' && data.score < minScore) {
       return res.status(400).json({
         success: false,
         message: 'Captcha score too low',
-        score: data.score,
       });
     }
 
     return next();
   } catch (error) {
+    const isDev = process.env.NODE_ENV === 'development';
+    
     return res.status(500).json({
       success: false,
       message: 'Captcha verification failed',
-      error: error && error.message ? error.message : error,
+      error: isDev ? (error.message || error) : 'Internal Server Error',
     });
   }
 };

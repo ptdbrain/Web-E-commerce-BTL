@@ -21,7 +21,6 @@ function OptimizedImage({
   src,
   alt = "",
   className = "",
-  placeholder = "/placeholder-blur.png",
   fallback = "/image-not-found.png",
   priority = false,
   ...props

@@ -19,7 +19,7 @@ export function OrderSummary({ cartItems, voucherResult, fulfillmentType }) {
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
       <h3 className="font-display text-xl font-bold text-slate-900">
-        Xac nhan don mon
+        Xác nhận đơn món
       </h3>
 
       <div className="mt-5 space-y-3">
@@ -70,7 +70,7 @@ export function OrderSummary({ cartItems, voucherResult, fulfillmentType }) {
 
         <div className="flex justify-between text-sm text-slate-500">
           <span>
-            {fulfillmentType === "delivery" ? "Phi giao hang" : "Phi phuc vu"}
+            {fulfillmentType === "delivery" ? "Phí giao hàng" : "Phí phục vụ"}
           </span>
           <span>
             {totals.deliveryFee > 0 ? formatPrice(totals.deliveryFee) : "Mien phi"}

@@ -18,6 +18,10 @@ import { storeConfig } from "../data/menuData.js";
 import { useCart } from "../hooks/useCart";
 import { buildVoucherItemPayload } from "../utils/cartPayload.js";
 import { calculateCheckoutTotals } from "../utils/checkoutPricing.js";
+import {
+  getCheckoutContactFromUser,
+  isCheckoutContactComplete,
+} from "../utils/checkoutContact.js";
 
 const formatVoucherValue = (voucher = {}) => {
   if (voucher.discountType === "free_shipping") {
@@ -53,6 +57,10 @@ export default function CheckoutPage() {
   const [applying, setApplying] = useState(false);
   const [availableVouchers, setAvailableVouchers] = useState([]);
   const [showVoucherList, setShowVoucherList] = useState(false);
+  const [contactMode, setContactMode] = useState("account");
+  const [accountContact, setAccountContact] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
 
   const selectedItems = useMemo(
     () =>
@@ -100,6 +108,71 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setProfileLoading(false);
+      setContactMode("custom");
+      return;
+    }
+
+    let cancelled = false;
+
+    axios
+      .get(buildApiUrl("/user/me"), {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((response) => {
+        if (cancelled) return;
+        const contact = getCheckoutContactFromUser(response.data?.user);
+        setAccountContact(contact);
+        setFormData((previous) => ({ ...previous, ...contact }));
+
+        if (!isCheckoutContactComplete(contact, "delivery")) {
+          setContactMode("custom");
+          setProfileError(
+            "Hồ sơ chưa đủ thông tin nhận món. Vui lòng bổ sung cho đơn hàng này."
+          );
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setContactMode("custom");
+        setProfileError(
+          "Không tải được thông tin tài khoản. Bạn vẫn có thể nhập thông tin nhận món."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setFormData]);
+
+  useEffect(() => {
+    if (
+      contactMode === "account" &&
+      accountContact &&
+      !isCheckoutContactComplete(accountContact, formData.fulfillmentType)
+    ) {
+      setContactMode("custom");
+      setProfileError(
+        "Hồ sơ chưa có địa chỉ giao hàng. Vui lòng nhập địa chỉ cho đơn này."
+      );
+    }
+  }, [accountContact, contactMode, formData.fulfillmentType]);
+
+  const handleContactModeChange = (mode) => {
+    setContactMode(mode);
+    setProfileError("");
+
+    if (mode === "account" && accountContact) {
+      setFormData((previous) => ({ ...previous, ...accountContact }));
+    }
+  };
+
+  useEffect(() => {
     setVoucherError("");
     setVoucherResult(null);
   }, [formData.fulfillmentType, selectedItemsSignature, setVoucherResult]);
@@ -109,18 +182,18 @@ export default function CheckoutPage() {
     const code = String(codeParam ?? voucherCode).trim().toUpperCase();
 
     if (!code) {
-      setVoucherError("Vui long nhap ma voucher.");
+      setVoucherError("Vui lòng nhập mã voucher.");
       return;
     }
 
     if (selectedItems.length === 0) {
-      setVoucherError("Chua co mon nao duoc chon.");
+      setVoucherError("Chưa có món nào được chọn.");
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setVoucherError("Ban can dang nhap de dung voucher.");
+      setVoucherError("Bạn cần đăng nhập để dùng voucher.");
       return;
     }
 
@@ -131,7 +204,7 @@ export default function CheckoutPage() {
         {
           code,
           items: selectedItems.map(buildVoucherItemPayload),
-          orderTotal: totals.subtotal,
+          orderTotal: totals.subtotal + totals.deliveryFee,
           deliveryFee: totals.deliveryFee,
           fulfillmentType: formData.fulfillmentType,
         },
@@ -145,7 +218,7 @@ export default function CheckoutPage() {
     } catch (error) {
       setVoucherResult(null);
       setVoucherError(
-        error?.response?.data?.message || "Ap dung voucher that bai."
+        error?.response?.data?.message || "Áp dụng voucher thất bại."
       );
     } finally {
       setApplying(false);
@@ -153,15 +226,15 @@ export default function CheckoutPage() {
   };
 
   const paymentOptions = [
-    { value: "cash", label: "Tien mat khi nhan mon", icon: FiDollarSign },
+    { value: "cash", label: "Tiền mặt khi nhận món", icon: FiDollarSign },
     { value: "zalopay", label: "ZaloPay", icon: FiCreditCard },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50/50 to-slate-50 px-4 py-8">
       <SEO
-        title="Checkout dat mon"
-        description={`Hoan tat don mon tai ${storeConfig.name}`}
+        title="Checkout đặt món"
+        description={`Hoàn tất đơn món tại ${storeConfig.name}`}
       />
 
       <div className="mx-auto max-w-6xl">
@@ -172,13 +245,13 @@ export default function CheckoutPage() {
               className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-orange-600"
             >
               <FiArrowLeft size={14} />
-              Quay lai
+              Quay lại
             </button>
             <h2 className="font-display text-3xl font-extrabold text-slate-900">
-              Xac nhan dat mon
+              Xác nhận đặt món
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Delivery, pickup va dine-in trong cung mot form.
+              Delivery, pickup và dine-in trong cùng một form.
             </p>
           </div>
         </div>
@@ -191,29 +264,37 @@ export default function CheckoutPage() {
           >
             <div className="mb-4 text-6xl">Done</div>
             <h3 className="font-display text-3xl font-extrabold text-emerald-700">
-              Dat mon thanh cong
+              Đặt món thành công
             </h3>
             <p className="mt-3 text-emerald-600">
-              Cam on ban da dat mon tai {storeConfig.name}.
+              Cảm ơn bạn đã đặt món tại {storeConfig.name}.
             </p>
             <button
               onClick={() => navigate("/orders")}
               className="mt-6 rounded-full bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-colors hover:bg-emerald-700"
             >
-              Xem don hang
+              Xem đơn hàng
             </button>
           </motion.div>
         ) : (
           <form onSubmit={handlePlaceOrder}>
             <div className="grid items-start gap-6 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-6">
-                <CheckoutForm formData={formData} setFormData={setFormData} />
+                <CheckoutForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  contactMode={contactMode}
+                  onContactModeChange={handleContactModeChange}
+                  accountContact={accountContact}
+                  profileLoading={profileLoading}
+                  profileError={profileError}
+                />
               </div>
 
               <div className="space-y-5">
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
                   <h3 className="mb-3 font-display text-base font-bold text-slate-900">
-                    Phuong thuc thanh toan
+                    Phương thức thanh toán
                   </h3>
                   <div className="space-y-2">
                     {paymentOptions.map((option) => {
@@ -264,7 +345,7 @@ export default function CheckoutPage() {
 
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
                   <h3 className="mb-3 font-display text-base font-bold text-slate-900">
-                    Ma voucher
+                    Mã voucher
                   </h3>
                   <div className="flex gap-2">
                     <input
@@ -273,7 +354,7 @@ export default function CheckoutPage() {
                       onChange={(event) =>
                         setVoucherCode(event.target.value.toUpperCase())
                       }
-                      placeholder="Nhap ma voucher"
+                      placeholder="Nhập mã voucher"
                       className="flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm outline-none transition-all focus:border-orange-400 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
                     />
                     <button
@@ -282,7 +363,7 @@ export default function CheckoutPage() {
                       disabled={applying}
                       className="rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-shadow hover:shadow-md disabled:opacity-60"
                     >
-                      {applying ? "Dang xu ly" : "Ap dung"}
+                      {applying ? "Đang xử lý" : "Áp dụng"}
                     </button>
                   </div>
 
@@ -292,7 +373,7 @@ export default function CheckoutPage() {
 
                   {voucherResult?.voucher && (
                     <p className="mt-2 text-xs font-semibold text-emerald-600">
-                      Da ap dung voucher {voucherResult.voucher.code}
+                      Đã áp dụng voucher {voucherResult.voucher.code}
                     </p>
                   )}
 
@@ -301,7 +382,7 @@ export default function CheckoutPage() {
                     onClick={() => setShowVoucherList((prev) => !prev)}
                     className="mt-3 flex items-center gap-1 text-sm font-semibold text-orange-600 transition-colors hover:text-orange-700"
                   >
-                    {showVoucherList ? "An voucher kha dung" : "Xem voucher kha dung"}
+                    {showVoucherList ? "Ẩn voucher khả dụng" : "Xem voucher khả dụng"}
                     {showVoucherList ? (
                       <FiChevronUp size={14} />
                     ) : (
@@ -313,7 +394,7 @@ export default function CheckoutPage() {
                     <div className="mt-3 space-y-2 animate-fade-in-down">
                       {availableVouchers.length === 0 ? (
                         <p className="text-sm text-slate-400">
-                          Hien chua co voucher kha dung.
+                          Hiện chưa có voucher khả dụng.
                         </p>
                       ) : (
                         availableVouchers.map((voucher) => (
@@ -337,7 +418,7 @@ export default function CheckoutPage() {
                               )}
                               {voucher.minOrderValue > 0 && (
                                 <div className="mt-1 text-[11px] text-slate-500">
-                                  Don tu{" "}
+                                  Đơn từ{" "}
                                   {Number(voucher.minOrderValue).toLocaleString(
                                     "vi-VN"
                                   )}
@@ -363,15 +444,15 @@ export default function CheckoutPage() {
 
                 <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 text-sm text-slate-600">
                   <div className="flex items-center justify-between">
-                    <span>Tong tam tinh</span>
+                    <span>Tổng tạm tính</span>
                     <span className="font-semibold text-slate-900">
                       {totals.total.toLocaleString("vi-VN")}d
                     </span>
                   </div>
                   {voucherResult?.discountAmount > 0 && (
                     <div className="mt-2 text-xs text-emerald-600">
-                      Da giam {voucherResult.discountAmount.toLocaleString("vi-VN")}d
-                      {voucherResult.shippingDiscount > 0 ? " bao gom free ship" : ""}
+                      Đã giảm {voucherResult.discountAmount.toLocaleString("vi-VN")}d
+                      {voucherResult.shippingDiscount > 0 ? " bao gồm free ship" : ""}
                     </div>
                   )}
                 </div>
@@ -380,7 +461,7 @@ export default function CheckoutPage() {
                   type="submit"
                   className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/25 transition-all duration-200 hover:scale-[1.01] hover:shadow-xl hover:shadow-orange-500/30 active:scale-[0.99]"
                 >
-                  Xac nhan dat mon
+                  Xác nhận đặt món
                 </button>
               </div>
             </div>

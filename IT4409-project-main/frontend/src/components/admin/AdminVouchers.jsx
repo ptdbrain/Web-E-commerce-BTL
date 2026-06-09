@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   LoaderCircle,
+  PencilLine,
   RefreshCw,
   Search,
   TicketPercent,
@@ -52,9 +53,46 @@ const formatDate = (value) => {
   return date.toLocaleDateString("vi-VN");
 };
 
+const formatDateInput = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const toIdList = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => String(item?._id || item?.id || item || ""))
+    .filter(Boolean);
+
+const voucherToForm = (voucher = {}) => {
+  const userIds = toIdList(voucher.users);
+  const productIds = toIdList(voucher.products);
+  const categoryIds = toIdList(voucher.categories);
+
+  return {
+    code: voucher.code || "",
+    description: voucher.description || "",
+    discountType: voucher.discountType || "percent",
+    discountValue: Number(voucher.discountValue || 0),
+    maxDiscountAmount: Number(voucher.maxDiscountAmount || 0),
+    minOrderValue: Number(voucher.minOrderValue || 0),
+    maxUsage: Number(voucher.maxUsage || 0),
+    startDate: formatDateInput(voucher.startDate),
+    endDate: formatDateInput(voucher.endDate),
+    appliesToAllUsers: voucher.appliesToAllUsers || userIds.length === 0,
+    appliesToAllProducts:
+      voucher.appliesToAllProducts ||
+      (productIds.length === 0 && categoryIds.length === 0),
+    userIds,
+    productIds,
+    categoryIds,
+  };
+};
+
 const getTargetSummary = (form) => {
-  if (form.appliesToAllProducts) return "Toan bo menu";
-  return `${form.productIds.length} mon | ${form.categoryIds.length} danh muc`;
+  if (form.appliesToAllProducts) return "Toàn bộ menu";
+  return `${form.productIds.length} món | ${form.categoryIds.length} danh mục`;
 };
 
 export default function AdminVouchers() {
@@ -65,6 +103,7 @@ export default function AdminVouchers() {
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(createInitialForm());
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState("");
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -79,7 +118,7 @@ export default function AdminVouchers() {
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [actingVoucherId, setActingVoucherId] = useState("");
 
-  const getAuthConfig = () => {
+  const getAuthConfig = useCallback(() => {
     const token = localStorage.getItem("token");
     return token
       ? {
@@ -88,9 +127,9 @@ export default function AdminVouchers() {
           },
         }
       : { headers: {} };
-  };
+  }, []);
 
-  const loadVouchers = async () => {
+  const loadVouchers = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -100,15 +139,15 @@ export default function AdminVouchers() {
     } catch (err) {
       console.error("Failed to load vouchers", err);
       setVouchers([]);
-      setError(err?.response?.data?.message || "Khong the tai voucher.");
+      setError(err?.response?.data?.message || "Không thể tải voucher.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
   useEffect(() => {
     loadVouchers();
-  }, []);
+  }, [loadVouchers]);
 
   const filteredVouchers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -128,7 +167,7 @@ export default function AdminVouchers() {
       active: vouchers.filter((voucher) => voucher.isActive).length,
       expiringSoon: vouchers.filter(isExpiringSoon).length,
       targeted: vouchers.filter(
-        (voucher) => !voucher.appliesToAllUsers || describeVoucherScope(voucher) !== "Toan bo menu"
+        (voucher) => !voucher.appliesToAllUsers || describeVoucherScope(voucher) !== "Toàn bộ menu"
       ).length,
       totalUses: vouchers.reduce(
         (sum, voucher) => sum + Number(voucher.usedCount || 0),
@@ -180,6 +219,7 @@ export default function AdminVouchers() {
 
   const resetCreateForm = () => {
     setForm(createInitialForm());
+    setEditingVoucherId("");
     setUserResults([]);
     setProductResults([]);
     setCategoryResults([]);
@@ -188,43 +228,70 @@ export default function AdminVouchers() {
     setCategorySearch("");
   };
 
-  const handleCreateVoucher = async (event) => {
+  const openCreateForm = () => {
+    resetCreateForm();
+    setError("");
+    setShowCreateForm(true);
+  };
+
+  const openEditForm = (voucher) => {
+    setEditingVoucherId(voucher._id);
+    setForm(voucherToForm(voucher));
+    setError("");
+    setShowCreateForm(true);
+  };
+
+  const closeForm = () => {
+    setShowCreateForm(false);
+    resetCreateForm();
+  };
+
+  const handleSaveVoucher = async (event) => {
     event.preventDefault();
     setError("");
 
     try {
       setSaving(true);
-      const response = await axios.post(
-        buildApiUrl("/vouchers"),
-        {
-          ...form,
-          code: form.code.trim().toUpperCase(),
-          discountValue:
-            form.discountType === "free_shipping" ? 0 : Number(form.discountValue || 0),
-          maxDiscountAmount:
-            form.discountType === "percent"
-              ? Number(form.maxDiscountAmount || 0)
-              : 0,
-          userIds: form.appliesToAllUsers ? [] : form.userIds,
-          productIds: form.appliesToAllProducts ? [] : form.productIds,
-          categoryIds: form.appliesToAllProducts ? [] : form.categoryIds,
-        },
-        getAuthConfig()
-      );
+      const payload = {
+        ...form,
+        code: form.code.trim().toUpperCase(),
+        discountValue:
+          form.discountType === "free_shipping" ? 0 : Number(form.discountValue || 0),
+        maxDiscountAmount:
+          form.discountType === "percent"
+            ? Number(form.maxDiscountAmount || 0)
+            : 0,
+        userIds: form.appliesToAllUsers ? [] : form.userIds,
+        productIds: form.appliesToAllProducts ? [] : form.productIds,
+        categoryIds: form.appliesToAllProducts ? [] : form.categoryIds,
+      };
 
-      setVouchers((prev) => [response.data.voucher, ...prev]);
-      setShowCreateForm(false);
-      resetCreateForm();
+      const response = editingVoucherId
+        ? await axios.put(
+            buildApiUrl(`/vouchers/${editingVoucherId}`),
+            payload,
+            getAuthConfig()
+          )
+        : await axios.post(buildApiUrl("/vouchers"), payload, getAuthConfig());
+
+      setVouchers((prev) =>
+        editingVoucherId
+          ? prev.map((voucher) =>
+              voucher._id === editingVoucherId ? response.data.voucher : voucher
+            )
+          : [response.data.voucher, ...prev]
+      );
+      closeForm();
     } catch (err) {
-      console.error("Failed to create voucher", err);
-      setError(err?.response?.data?.message || "Khong the tao voucher.");
+      console.error("Failed to save voucher", err);
+      setError(err?.response?.data?.message || "Không thể lưu voucher.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteVoucher = async (voucherId) => {
-    if (!window.confirm("Xoa voucher nay?")) return;
+    if (!window.confirm("Xóa voucher này?")) return;
     setActingVoucherId(voucherId);
     setError("");
 
@@ -233,7 +300,7 @@ export default function AdminVouchers() {
       setVouchers((prev) => prev.filter((voucher) => voucher._id !== voucherId));
     } catch (err) {
       console.error("Failed to delete voucher", err);
-      setError(err?.response?.data?.message || "Khong the xoa voucher.");
+      setError(err?.response?.data?.message || "Không thể xóa voucher.");
     } finally {
       setActingVoucherId("");
     }
@@ -255,13 +322,13 @@ export default function AdminVouchers() {
       );
     } catch (err) {
       console.error("Failed to toggle voucher", err);
-      setError(err?.response?.data?.message || "Khong the cap nhat voucher.");
+      setError(err?.response?.data?.message || "Không thể cập nhật voucher.");
     } finally {
       setActingVoucherId("");
     }
   };
 
-  const fetchUsers = async (searchValue) => {
+  const fetchUsers = useCallback(async (searchValue) => {
     setUserLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-users"), {
@@ -274,9 +341,9 @@ export default function AdminVouchers() {
     } finally {
       setUserLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
-  const fetchProducts = async (searchValue) => {
+  const fetchProducts = useCallback(async (searchValue) => {
     setProductLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-products"), {
@@ -291,9 +358,9 @@ export default function AdminVouchers() {
     } finally {
       setProductLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
-  const fetchCategories = async (searchValue) => {
+  const fetchCategories = useCallback(async (searchValue) => {
     setCategoryLoading(true);
     try {
       const response = await axios.get(buildApiUrl("/vouchers/search-categories"), {
@@ -308,25 +375,25 @@ export default function AdminVouchers() {
     } finally {
       setCategoryLoading(false);
     }
-  };
+  }, [getAuthConfig]);
 
   useEffect(() => {
     if (!userModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchUsers(userSearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [userModalOpen, userSearch]);
+  }, [fetchUsers, userModalOpen, userSearch]);
 
   useEffect(() => {
     if (!productModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchProducts(productSearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [productModalOpen, productSearch]);
+  }, [fetchProducts, productModalOpen, productSearch]);
 
   useEffect(() => {
     if (!categoryModalOpen) return undefined;
     const timeoutId = setTimeout(() => fetchCategories(categorySearch), 300);
     return () => clearTimeout(timeoutId);
-  }, [categoryModalOpen, categorySearch]);
+  }, [categoryModalOpen, categorySearch, fetchCategories]);
 
   const openUserModal = () => {
     setUserModalOpen(true);
@@ -395,20 +462,20 @@ export default function AdminVouchers() {
 
           <button
             type="button"
-            onClick={() => setShowCreateForm(true)}
+            onClick={openCreateForm}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <TicketPercent size={16} />
-            Tao voucher moi
+            Tạo voucher mới
           </button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Dang hoat dong", value: stats.active },
-            { label: "Sap het han", value: stats.expiringSoon },
-            { label: "Voucher target", value: stats.targeted },
-            { label: "Tong luot su dung", value: stats.totalUses },
+            { label: "Đang hoạt động", value: stats.active },
+            { label: "Sắp hết hạn", value: stats.expiringSoon },
+            { label: "Voucher chỉ định", value: stats.targeted },
+            { label: "Tổng lượt sử dụng", value: stats.totalUses },
           ].map((card) => (
             <div
               key={card.label}
@@ -432,7 +499,7 @@ export default function AdminVouchers() {
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tim theo ma hoac mo ta voucher..."
+              placeholder="Tìm theo mã hoặc mô tả voucher..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
             />
           </label>
@@ -443,7 +510,7 @@ export default function AdminVouchers() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
             <RefreshCw size={16} />
-            Tai lai
+            Tải lại
           </button>
         </div>
 
@@ -469,10 +536,10 @@ export default function AdminVouchers() {
             <TicketPercent size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Chua co voucher nao
+            Chưa có voucher nào
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Tao voucher moi de bat dau campaign cho cua hang.
+            Tạo voucher mới để bắt đầu campaign cho cửa hàng.
           </p>
         </section>
       ) : (
@@ -491,7 +558,7 @@ export default function AdminVouchers() {
                     {formatAdminVoucherValue(voucher)}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    {voucher.description || "Khong co mo ta cho voucher nay."}
+                    {voucher.description || "Không có mô tả cho voucher này."}
                   </p>
                 </div>
 
@@ -502,19 +569,19 @@ export default function AdminVouchers() {
                       : "border border-slate-200 bg-slate-100 text-slate-600"
                   }`}
                 >
-                  {voucher.isActive ? "Dang hoat dong" : "Tam tat"}
+                  {voucher.isActive ? "Đang hoạt động" : "Tạm tắt"}
                 </span>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                    Don toi thieu
+                    Đơn tối thiểu
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {voucher.minOrderValue
                       ? formatPriceAdmin(voucher.minOrderValue)
-                      : "Khong gioi han"}
+                      : "Không giới hạn"}
                   </div>
                 </div>
 
@@ -524,7 +591,7 @@ export default function AdminVouchers() {
                   </div>
                   <div className="mt-1 font-semibold text-slate-900">
                     {voucher.usedCount || 0}
-                    {voucher.maxUsage ? ` / ${voucher.maxUsage}` : " lan"}
+                    {voucher.maxUsage ? ` / ${voucher.maxUsage}` : " lần"}
                   </div>
                 </div>
 
@@ -543,7 +610,7 @@ export default function AdminVouchers() {
                   </div>
                   <div className="mt-1 text-sm font-medium text-slate-700">
                     {voucher.appliesToAllUsers
-                      ? "Tat ca user"
+                      ? "Tất cả user"
                       : `${voucher.users?.length || 0} user`}
                     {" | "}
                     {describeVoucherScope(voucher)}
@@ -554,6 +621,15 @@ export default function AdminVouchers() {
               <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => openEditForm(voucher)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <PencilLine size={16} />
+                  Chỉnh sửa
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleToggleVoucherStatus(voucher)}
                   disabled={actingVoucherId === voucher._id}
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
@@ -561,7 +637,7 @@ export default function AdminVouchers() {
                   {actingVoucherId === voucher._id ? (
                     <LoaderCircle size={16} className="animate-spin" />
                   ) : null}
-                  {voucher.isActive ? "Tam tat voucher" : "Kich hoat voucher"}
+                  {voucher.isActive ? "Tạm tắt voucher" : "Kích hoạt voucher"}
                 </button>
 
                 <button
@@ -575,7 +651,7 @@ export default function AdminVouchers() {
                   ) : (
                     <Trash2 size={16} />
                   )}
-                  Xoa voucher
+                  Xóa voucher
                 </button>
               </div>
             </article>
@@ -589,10 +665,10 @@ export default function AdminVouchers() {
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
-                  Tao voucher moi
+                  {editingVoucherId ? "Cập nhật voucher" : "Tạo voucher mới"}
                 </div>
                 <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
-                  FireBite promotion builder
+                  {editingVoucherId ? "Chỉnh sửa promotion" : "FireBite promotion builder"}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Chon muc giam, thoi gian va pham vi ap dung cho voucher.
@@ -601,10 +677,7 @@ export default function AdminVouchers() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  resetCreateForm();
-                }}
+                onClick={closeForm}
                 className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
               >
                 Dong
@@ -612,7 +685,7 @@ export default function AdminVouchers() {
             </div>
 
             <form
-              onSubmit={handleCreateVoucher}
+              onSubmit={handleSaveVoucher}
               className="max-h-[calc(94vh-92px)] overflow-y-auto p-6"
             >
               <div className="space-y-6">
@@ -632,13 +705,13 @@ export default function AdminVouchers() {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Mo ta</label>
+                        <label className={labelClass}>Mô tả</label>
                         <input
                           name="description"
                           value={form.description}
                           onChange={handleFormChange}
                           className={inputClass}
-                          placeholder="Giam 20% cho combo bua trua"
+                          placeholder="Giảm 20% cho combo bữa trưa"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -658,10 +731,10 @@ export default function AdminVouchers() {
                         <div>
                           <label className={labelClass}>
                             {form.discountType === "percent"
-                              ? "Gia tri (%)"
+                              ? "Giá trị (%)"
                               : form.discountType === "amount"
-                              ? "Gia tri (VND)"
-                              : "Gia tri"}
+                              ? "Giá trị (VND)"
+                              : "Giá trị"}
                           </label>
                           <input
                             type="number"
@@ -699,7 +772,7 @@ export default function AdminVouchers() {
                     <div className="mt-4 grid gap-4">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
-                          <label className={labelClass}>Don toi thieu (VND)</label>
+                          <label className={labelClass}>Đơn tối thiểu (VND)</label>
                           <input
                             type="number"
                             min="0"
@@ -840,13 +913,10 @@ export default function AdminVouchers() {
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-6">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      resetCreateForm();
-                    }}
+                    onClick={closeForm}
                     className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    Huy
+                    Hủy
                   </button>
                   <button
                     type="submit"
@@ -856,7 +926,7 @@ export default function AdminVouchers() {
                     {saving ? (
                       <LoaderCircle size={16} className="animate-spin" />
                     ) : null}
-                    Tao voucher
+                    {editingVoucherId ? "Cập nhật voucher" : "Tạo voucher"}
                   </button>
                 </div>
               </div>
@@ -883,13 +953,13 @@ export default function AdminVouchers() {
                 type="text"
                 value={userSearch}
                 onChange={(event) => setUserSearch(event.target.value)}
-                placeholder="Tim theo ten, username hoac email"
+                placeholder="Tìm theo tên, username hoặc email"
                 className={inputClass}
               />
 
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {userLoading ? (
-                  <div className="p-4 text-sm text-slate-400">Dang tai user...</div>
+                  <div className="p-4 text-sm text-slate-400">Đang tải user...</div>
                 ) : userResults.length > 0 ? (
                   userResults.map((user) => (
                     <label
@@ -907,7 +977,7 @@ export default function AdminVouchers() {
                     </label>
                   ))
                 ) : (
-                  <div className="p-4 text-sm text-slate-400">Khong tim thay user.</div>
+                  <div className="p-4 text-sm text-slate-400">Không tìm thấy user.</div>
                 )}
               </div>
             </div>
@@ -933,13 +1003,13 @@ export default function AdminVouchers() {
                 type="text"
                 value={productSearch}
                 onChange={(event) => setProductSearch(event.target.value)}
-                placeholder="Tim theo ten mon..."
+                placeholder="Tìm theo tên món..."
                 className={inputClass}
               />
 
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {productLoading ? (
-                  <div className="p-4 text-sm text-slate-400">Dang tai menu...</div>
+                  <div className="p-4 text-sm text-slate-400">Đang tải menu...</div>
                 ) : productResults.length > 0 ? (
                   productResults.map((product) => (
                     <label
@@ -956,7 +1026,7 @@ export default function AdminVouchers() {
                   ))
                 ) : (
                   <div className="p-4 text-sm text-slate-400">
-                    Khong tim thay mon phu hop.
+                    Không tìm thấy món phù hợp.
                   </div>
                 )}
               </div>
@@ -983,14 +1053,14 @@ export default function AdminVouchers() {
                 type="text"
                 value={categorySearch}
                 onChange={(event) => setCategorySearch(event.target.value)}
-                placeholder="Tim theo ten danh muc..."
+                placeholder="Tìm theo tên danh mục..."
                 className={inputClass}
               />
 
               <div className="max-h-[52vh] overflow-y-auto rounded-[24px] border border-slate-100">
                 {categoryLoading ? (
                   <div className="p-4 text-sm text-slate-400">
-                    Dang tai danh muc...
+                    Đang tải danh mục...
                   </div>
                 ) : categoryResults.length > 0 ? (
                   categoryResults.map((category) => (
@@ -1008,7 +1078,7 @@ export default function AdminVouchers() {
                   ))
                 ) : (
                   <div className="p-4 text-sm text-slate-400">
-                    Khong tim thay danh muc phu hop.
+                    Không tìm thấy danh mục phù hợp.
                   </div>
                 )}
               </div>

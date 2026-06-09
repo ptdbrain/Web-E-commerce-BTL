@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { clearProductsCache } from "../../api/productsApi";
 import { buildApiUrl } from "../../config/api";
-import { categories } from "../../data/categories";
+import { categories as fallbackCategories } from "../../data/categories";
 import {
   buildAdminProductPayload,
   createAdminAddon,
@@ -27,19 +27,19 @@ import {
 } from "./utils";
 
 const ITEM_TYPE_OPTIONS = [
-  { value: "single", label: "Mon le" },
+  { value: "single", label: "Món lẻ" },
   { value: "combo", label: "Combo" },
-  { value: "drink", label: "Do uong" },
-  { value: "side", label: "Mon phu" },
-  { value: "dessert", label: "Trang mieng" },
+  { value: "drink", label: "Đồ uống" },
+  { value: "side", label: "Món phụ" },
+  { value: "dessert", label: "Tráng miệng" },
 ];
 
 const SPICE_LEVEL_OPTIONS = [
-  { value: "", label: "Khong chon" },
-  { value: "none", label: "Khong cay" },
-  { value: "mild", label: "Cay nhe" },
-  { value: "medium", label: "Cay vua" },
-  { value: "hot", label: "Cay dam" },
+  { value: "", label: "Không chọn" },
+  { value: "none", label: "Không cay" },
+  { value: "mild", label: "Cay nhẹ" },
+  { value: "medium", label: "Cay vừa" },
+  { value: "hot", label: "Cay đậm" },
 ];
 
 const inputClass =
@@ -52,7 +52,34 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const getProductImage = (product) => product.images?.[0] || product.image || "";
+const getProductImage = (product) =>
+  [product.images, product.image]
+    .flat()
+    .find((image) => typeof image === "string" && image.trim()) || "";
+
+const AdminProductImage = ({ src, alt, className = "h-full w-full object-cover" }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div
+        className={`${className} flex items-center justify-center bg-[linear-gradient(135deg,#fff7ed_0%,#e2e8f0_100%)] text-xs font-semibold uppercase tracking-[0.24em] text-slate-500`}
+      >
+        Chưa có ảnh
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 const getProductSearchTarget = (product) =>
   [
@@ -69,6 +96,7 @@ const getProductSearchTarget = (product) =>
 
 export const AdminProducts = () => {
   const [products, setProducts] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState(fallbackCategories);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -87,19 +115,44 @@ export const AdminProducts = () => {
     setError("");
 
     try {
-      const response = await axios.get(buildApiUrl("/products"));
-      setProducts(Array.isArray(response.data) ? response.data : []);
+      const token = localStorage.getItem("token");
+      const response = await axios.get(buildApiUrl("/admin/products?limit=200"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rawProducts = Array.isArray(response.data)
+        ? response.data
+        : response.data?.data || [];
+      setProducts(Array.isArray(rawProducts) ? rawProducts : []);
     } catch (err) {
       console.error("Failed to load products", err);
       setProducts([]);
-      setError(err?.response?.data?.message || "Khong the tai menu hien tai.");
+      setError(err?.response?.data?.message || "Không thể tải menu hiện tại.");
     } finally {
       setLoading(false);
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(buildApiUrl("/admin/categories"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const rawCategories = Array.isArray(response.data)
+        ? response.data
+        : response.data?.categories || [];
+      if (rawCategories.length > 0) {
+        setCategoryOptions(rawCategories);
+      }
+    } catch (err) {
+      console.error("Failed to load categories for admin products", err);
+      setCategoryOptions(fallbackCategories);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -117,8 +170,8 @@ export const AdminProducts = () => {
       const matchesAvailability =
         filters.availability === "all" ||
         (filters.availability === "available"
-          ? product.isAvailable !== false
-          : product.isAvailable === false);
+          ? product.isAvailable !== false && product.isActive !== false
+          : product.isAvailable === false || product.isActive === false);
 
       return matchesQuery && matchesCategory && matchesAvailability;
     });
@@ -127,7 +180,9 @@ export const AdminProducts = () => {
   const stats = useMemo(
     () => ({
       total: products.length,
-      available: products.filter((product) => product.isAvailable !== false).length,
+      available: products.filter(
+        (product) => product.isAvailable !== false && product.isActive !== false
+      ).length,
       bestseller: products.filter((product) => product.isBestSeller).length,
       combos: products.filter((product) => product.itemType === "combo").length,
     }),
@@ -205,18 +260,18 @@ export const AdminProducts = () => {
     setError("");
 
     if (!formState.name.trim()) {
-      setError("Ten mon khong duoc de trong.");
+      setError("Tên món không được để trống.");
       return;
     }
 
     if (!formState.category) {
-      setError("Can chon danh muc.");
+      setError("Cần chọn danh mục.");
       return;
     }
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Can dang nhap admin de cap nhat menu.");
+      setError("Cần đăng nhập admin để cập nhật menu.");
       return;
     }
 
@@ -241,7 +296,7 @@ export const AdminProducts = () => {
       closeForm();
     } catch (err) {
       console.error("Failed to save product", err);
-      setError(err?.response?.data?.message || "Khong the luu mon an.");
+      setError(err?.response?.data?.message || "Không thể lưu món ăn.");
     } finally {
       setSaving(false);
     }
@@ -250,11 +305,11 @@ export const AdminProducts = () => {
   const handleDelete = async (productId) => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Can dang nhap admin de xoa mon an.");
+      setError("Cần đăng nhập admin để gỡ món ăn.");
       return;
     }
 
-    if (!window.confirm("Xoa mon nay khoi menu?")) return;
+    if (!window.confirm("Ẩn món này khỏi storefront?")) return;
 
     setDeletingId(productId);
     setError("");
@@ -267,7 +322,7 @@ export const AdminProducts = () => {
       await loadProducts();
     } catch (err) {
       console.error("Failed to delete product", err);
-      setError(err?.response?.data?.message || "Khong the xoa mon an.");
+      setError(err?.response?.data?.message || "Không thể gỡ món ăn.");
     } finally {
       setDeletingId("");
     }
@@ -279,14 +334,14 @@ export const AdminProducts = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-100">
-              Quan ly menu
+              Quản lý menu
             </div>
             <h2 className="mt-4 font-display text-3xl font-black tracking-tight">
               FireBite Menu Studio
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Tao va chinh sua burger, ga ran, combo, do uong va add-on trong
-              cung mot workspace.
+              Tạo và chỉnh sửa burger, gà rán, combo, đồ uống và add-on trong
+              cùng một workspace.
             </p>
           </div>
 
@@ -296,7 +351,7 @@ export const AdminProducts = () => {
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform hover:scale-[1.01]"
           >
             <Plus size={18} />
-            Them mon moi
+            Thêm món mới
           </button>
         </div>
 
@@ -304,13 +359,13 @@ export const AdminProducts = () => {
           {[
             {
               icon: Package2,
-              label: "Tong mon",
+              label: "Tổng món",
               value: stats.total,
               accent: "from-orange-500 to-rose-500",
             },
             {
               icon: Sparkles,
-              label: "Dang phuc vu",
+              label: "Đang phục vụ",
               value: stats.available,
               accent: "from-emerald-500 to-lime-500",
             },
@@ -322,7 +377,7 @@ export const AdminProducts = () => {
             },
             {
               icon: Clock3,
-              label: "Combo / nhom",
+              label: "Combo / nhóm",
               value: stats.combos,
               accent: "from-cyan-500 to-sky-500",
             },
@@ -363,7 +418,7 @@ export const AdminProducts = () => {
                 onChange={(event) =>
                   setFilters((prev) => ({ ...prev, query: event.target.value }))
                 }
-                placeholder="Tim theo ten mon, category, badge..."
+                placeholder="Tìm theo tên món, danh mục, badge..."
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-12 py-3 text-sm text-slate-700 outline-none transition-all focus:border-orange-300 focus:bg-white focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
               />
             </label>
@@ -375,8 +430,8 @@ export const AdminProducts = () => {
               }
               className={inputClass}
             >
-              <option value="all">Tat ca danh muc</option>
-              {categories.map((category) => (
+              <option value="all">Tất cả danh mục</option>
+              {categoryOptions.map((category) => (
                 <option key={category.slug} value={category.slug}>
                   {category.name}
                 </option>
@@ -393,9 +448,9 @@ export const AdminProducts = () => {
               }
               className={inputClass}
             >
-              <option value="all">Tat ca trang thai</option>
-              <option value="available">Dang ban</option>
-              <option value="hidden">Tam an / het mon</option>
+              <option value="all">Tất cả trạng thái</option>
+              <option value="available">Đang bán</option>
+              <option value="hidden">Tạm ẩn / hết món</option>
             </select>
           </div>
 
@@ -405,7 +460,7 @@ export const AdminProducts = () => {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
           >
             <RefreshCw size={16} />
-            Tai lai
+            Tải lại
           </button>
         </div>
 
@@ -431,10 +486,10 @@ export const AdminProducts = () => {
             <Package2 size={28} />
           </div>
           <h3 className="mt-4 font-display text-2xl font-black text-slate-900">
-            Chua co mon phu hop
+            Chưa có món phù hợp
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Thu doi bo loc hoac them mon moi vao menu FireBite.
+            Thử đổi bộ lọc hoặc thêm món mới vào menu FireBite.
           </p>
         </section>
       ) : (
@@ -449,17 +504,7 @@ export const AdminProducts = () => {
                 className="overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-xl shadow-slate-200/30 backdrop-blur transition-transform hover:-translate-y-0.5"
               >
                 <div className="relative h-56 overflow-hidden bg-slate-200">
-                  {productImage ? (
-                    <img
-                      src={productImage}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300 text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">
-                      FireBite
-                    </div>
-                  )}
+                  <AdminProductImage src={productImage} alt={product.name} />
 
                   <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
                     <div className="flex flex-wrap gap-2">
@@ -475,12 +520,14 @@ export const AdminProducts = () => {
                     </div>
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        product.isAvailable !== false
+                        product.isAvailable !== false && product.isActive !== false
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-900/70 text-white"
                       }`}
                     >
-                      {product.isAvailable !== false ? "Dang ban" : "Tam an"}
+                      {product.isAvailable !== false && product.isActive !== false
+                        ? "Đang bán"
+                        : "Tạm ẩn"}
                     </span>
                   </div>
                 </div>
@@ -492,7 +539,7 @@ export const AdminProducts = () => {
                         {product.name}
                       </h3>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {(product.description || "Chua co mo ta cho mon nay.").slice(
+                        {(product.description || "Chưa có mô tả cho món này.").slice(
                           0,
                           140
                         )}
@@ -524,10 +571,10 @@ export const AdminProducts = () => {
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Prep time
+                        Chuẩn bị
                       </div>
                       <div className="mt-1 text-lg font-semibold text-slate-900">
-                        {product.preparationTime ?? 15} phut
+                        {product.preparationTime ?? 15} phút
                       </div>
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
@@ -558,7 +605,7 @@ export const AdminProducts = () => {
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <PencilLine size={16} />
-                      Chinh sua
+                      Chỉnh sửa
                     </button>
                     <button
                       type="button"
@@ -571,7 +618,7 @@ export const AdminProducts = () => {
                       ) : (
                         <Trash2 size={16} />
                       )}
-                      Xoa mon
+                      Ẩn món
                     </button>
                   </div>
                 </div>
@@ -587,15 +634,16 @@ export const AdminProducts = () => {
             <div className="flex items-start justify-between border-b border-slate-100 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_50%,#f8fafc_100%)] px-6 py-5">
               <div>
                 <div className="inline-flex rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700">
-                  {editingProductId ? "Cap nhat mon" : "Tao mon moi"}
+                  {editingProductId ? "Cập nhật món" : "Tạo món mới"}
                 </div>
                 <h3 className="mt-3 font-display text-2xl font-black text-slate-950">
                   {editingProductId
-                    ? "Chinh sua menu item"
-                    : "Them item vao FireBite"}
+                    ? "Chỉnh sửa món trong menu"
+                    : "Thêm món vào FireBite"}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Upload anh moi neu can thay bo gallery hien tai.
+                  Thêm URL ảnh hoặc upload file mới. Khi cập nhật, danh sách ảnh
+                  trong form sẽ thay thế gallery hiện tại.
                 </p>
               </div>
 
@@ -612,37 +660,37 @@ export const AdminProducts = () => {
               <div className="space-y-6">
                 <div className="grid gap-6 lg:grid-cols-2">
                   <section className="rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
-                    <h4 className="font-semibold text-slate-950">Thong tin co ban</h4>
+                    <h4 className="font-semibold text-slate-950">Thông tin cơ bản</h4>
                     <div className="mt-4 grid gap-4">
                       <div>
-                        <label className={labelClass}>Ten mon</label>
+                        <label className={labelClass}>Tên món</label>
                         <input
                           type="text"
                           value={formState.name}
                           onChange={(event) => updateField("name", event.target.value)}
                           className={inputClass}
-                          placeholder="Vi du: Burger ga gion mat ong"
+                          placeholder="Ví dụ: Burger gà giòn mật ong"
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Slug (khong bat buoc)</label>
+                        <label className={labelClass}>Slug (không bắt buộc)</label>
                         <input
                           type="text"
                           value={formState.slug}
                           onChange={(event) => updateField("slug", event.target.value)}
                           className={inputClass}
-                          placeholder="Tu dong sinh neu de trong"
+                          placeholder="Tự động sinh nếu để trống"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
-                          <label className={labelClass}>Danh muc</label>
+                          <label className={labelClass}>Danh mục</label>
                           <select
                             value={formState.category}
                             onChange={(event) => updateField("category", event.target.value)}
                             className={inputClass}
                           >
-                            {categories.map((category) => (
+                            {categoryOptions.map((category) => (
                               <option key={category.slug} value={category.slug}>
                                 {category.name}
                               </option>
@@ -650,7 +698,7 @@ export const AdminProducts = () => {
                           </select>
                         </div>
                         <div>
-                          <label className={labelClass}>Loai item</label>
+                          <label className={labelClass}>Loại item</label>
                           <select
                             value={formState.itemType}
                             onChange={(event) => updateField("itemType", event.target.value)}
@@ -665,24 +713,24 @@ export const AdminProducts = () => {
                         </div>
                       </div>
                       <div>
-                        <label className={labelClass}>Mo ta mon</label>
+                        <label className={labelClass}>Mô tả món</label>
                         <textarea
                           value={formState.description}
                           onChange={(event) =>
                             updateField("description", event.target.value)
                           }
                           className={textareaClass}
-                          placeholder="Mo ta huong vi, thanh phan, phong cach phuc vu..."
+                          placeholder="Mô tả hương vị, thành phần, phong cách phục vụ..."
                         />
                       </div>
                     </div>
                   </section>
 
                   <section className="rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
-                    <h4 className="font-semibold text-slate-950">Gia va van hanh</h4>
+                    <h4 className="font-semibold text-slate-950">Giá và vận hành</h4>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       <div>
-                        <label className={labelClass}>Gia goc</label>
+                        <label className={labelClass}>Giá gốc</label>
                         <input
                           type="number"
                           min="0"
@@ -692,7 +740,7 @@ export const AdminProducts = () => {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Gia khuyen mai</label>
+                        <label className={labelClass}>Giá khuyến mãi</label>
                         <input
                           type="number"
                           min="0"
@@ -714,7 +762,7 @@ export const AdminProducts = () => {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Da ban</label>
+                        <label className={labelClass}>Đã bán</label>
                         <input
                           type="number"
                           min="0"
@@ -726,7 +774,7 @@ export const AdminProducts = () => {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Thoi gian chuan bi (phut)</label>
+                        <label className={labelClass}>Thời gian chuẩn bị (phút)</label>
                         <input
                           type="number"
                           min="0"
@@ -738,7 +786,7 @@ export const AdminProducts = () => {
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Muc do cay</label>
+                        <label className={labelClass}>Mức độ cay</label>
                         <select
                           value={formState.spiceLevel}
                           onChange={(event) =>
@@ -757,10 +805,10 @@ export const AdminProducts = () => {
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       {[
-                        { key: "isAvailable", label: "Dang ban" },
-                        { key: "isActive", label: "Hien tren storefront" },
+                        { key: "isAvailable", label: "Đang bán" },
+                        { key: "isActive", label: "Hiện trên storefront" },
                         { key: "isBestSeller", label: "Best seller" },
-                        { key: "isNew", label: "Gan nhan mon moi" },
+                        { key: "isNew", label: "Gắn nhãn món mới" },
                       ].map((flag) => (
                         <label
                           key={flag.key}
@@ -783,15 +831,15 @@ export const AdminProducts = () => {
                 <section className="rounded-[24px] border border-slate-100 bg-white p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <h4 className="font-semibold text-slate-950">Hinh anh menu</h4>
+                      <h4 className="font-semibold text-slate-950">Hình ảnh menu</h4>
                       <p className="mt-1 text-sm text-slate-500">
-                        Upload toi da 6 anh. Neu cap nhat va tai anh moi, bo anh cu se
-                        duoc thay the.
+                        Tối đa 6 ảnh. Có thể dùng URL ảnh sẵn có hoặc upload file
+                        mới nếu Cloudinary đã cấu hình.
                       </p>
                     </div>
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
                       <ImagePlus size={16} />
-                      Chon anh
+                      Chọn ảnh
                       <input
                         type="file"
                         accept="image/*"
@@ -802,36 +850,56 @@ export const AdminProducts = () => {
                     </label>
                   </div>
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Gallery hien tai
+                        URL ảnh đang lưu
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                      <textarea
+                        value={formState.imageUrlsText}
+                        onChange={(event) =>
+                          updateField("imageUrlsText", event.target.value)
+                        }
+                        className={`${textareaClass} mt-3 min-h-[150px] font-mono text-xs`}
+                        placeholder="https://cdn.example.com/burger.jpg&#10;/images/menu/local-fallback.png"
+                      />
+                      <div className="mt-3 text-xs leading-5 text-slate-500">
+                        Mỗi dòng là một ảnh. Khi lưu, danh sách này sẽ thay thế
+                        gallery hiện tại, file upload mới sẽ được nối thêm phía sau.
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Xem trước gallery
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
                         {formState.existingImages.length > 0 ? (
                           formState.existingImages.map((image, index) => (
                             <div
                               key={`${image}-${index}`}
                               className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
                             >
-                              <img
+                              <AdminProductImage
                                 src={image}
-                                alt={`Existing ${index + 1}`}
+                                alt={`Ảnh đã lưu ${index + 1}`}
                                 className="h-24 w-full object-cover"
                               />
                             </div>
                           ))
                         ) : (
                           <div className="col-span-full rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-400">
-                            Chua co anh duoc luu cho mon nay.
+                            Chưa có ảnh được lưu cho món này.
                           </div>
                         )}
                       </div>
                     </div>
+                  </div>
 
+                  <div className="mt-4">
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        File sap upload
+                        File sắp upload
                       </div>
                       <div className="mt-3 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 p-4">
                         {formState.imageFiles.length > 0 ? (
@@ -847,7 +915,7 @@ export const AdminProducts = () => {
                           </div>
                         ) : (
                           <div className="text-sm text-slate-400">
-                            Chua chon file moi.
+                            Chưa chọn file mới.
                           </div>
                         )}
                       </div>
@@ -864,7 +932,7 @@ export const AdminProducts = () => {
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Plus size={16} />
-                      Them size
+                      Thêm size
                     </button>
                   </div>
 
@@ -896,7 +964,7 @@ export const AdminProducts = () => {
                             )
                           }
                           className={inputClass}
-                          placeholder="Gia cong them"
+                          placeholder="Giá cộng thêm"
                         />
                         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
                           <input
@@ -911,7 +979,7 @@ export const AdminProducts = () => {
                               )
                             }
                           />
-                          Mac dinh
+                          Mặc định
                         </label>
                         <button
                           type="button"
@@ -934,7 +1002,7 @@ export const AdminProducts = () => {
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Plus size={16} />
-                      Them add-on
+                      Thêm add-on
                     </button>
                   </div>
 
@@ -951,7 +1019,7 @@ export const AdminProducts = () => {
                             updateDynamicItem("addons", index, "label", event.target.value)
                           }
                           className={inputClass}
-                          placeholder="Them pho mai / Sot dac biet"
+                          placeholder="Thêm phô mai / Sốt đặc biệt"
                         />
                         <input
                           type="number"
@@ -961,7 +1029,7 @@ export const AdminProducts = () => {
                             updateDynamicItem("addons", index, "price", event.target.value)
                           }
                           className={inputClass}
-                          placeholder="Gia"
+                          placeholder="Giá"
                         />
                         <input
                           type="number"
@@ -991,7 +1059,7 @@ export const AdminProducts = () => {
                               )
                             }
                           />
-                          San sang
+                          Sẵn sàng
                         </label>
                         <button
                           type="button"
@@ -1011,7 +1079,7 @@ export const AdminProducts = () => {
                     <div className="mt-4 grid gap-4">
                       <div>
                         <label className={labelClass}>
-                          Thanh phan combo (moi dong mot item)
+                          Thành phần combo (mỗi dòng một item)
                         </label>
                         <textarea
                           value={formState.comboItemsText}
@@ -1019,12 +1087,12 @@ export const AdminProducts = () => {
                             updateField("comboItemsText", event.target.value)
                           }
                           className={textareaClass}
-                          placeholder="2 burger ga gion&#10;1 khoai L&#10;2 ly nuoc"
+                          placeholder="2 burger gà giòn&#10;1 khoai L&#10;2 ly nước"
                         />
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Highlights (moi dong mot y)
+                          Highlights (mỗi dòng một ý)
                         </label>
                         <textarea
                           value={formState.highlightsText}
@@ -1032,12 +1100,12 @@ export const AdminProducts = () => {
                             updateField("highlightsText", event.target.value)
                           }
                           className={textareaClass}
-                          placeholder="Ga tam uop 12 gio&#10;Phu hop cho 2 nguoi"
+                          placeholder="Gà tẩm ướp 12 giờ&#10;Phù hợp cho 2 người"
                         />
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Badges (tach bang dau phay)
+                          Badges (tách bằng dấu phẩy)
                         </label>
                         <input
                           type="text"
@@ -1061,12 +1129,12 @@ export const AdminProducts = () => {
                     </div>
                     <div className="mt-2 text-sm text-slate-300">
                       {ITEM_TYPE_OPTIONS.find((item) => item.value === formState.itemType)?.label ||
-                        "Mon le"}{" "}
-                      • {categories.find((category) => category.slug === formState.category)?.name || formState.category}
+                        "Món lẻ"}{" "}
+                      - {categoryOptions.find((category) => category.slug === formState.category)?.name || formState.category}
                     </div>
                     <div className="mt-6 rounded-2xl bg-white/10 p-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-300">
-                        Gia hien thi
+                        Giá hiển thị
                       </div>
                       <div className="mt-2 font-display text-3xl font-black">
                         {formatPriceAdmin(
@@ -1076,8 +1144,8 @@ export const AdminProducts = () => {
                         )}
                       </div>
                       <div className="mt-2 text-sm text-slate-300">
-                        {toNumber(formState.preparationTime, 15)} phut •{" "}
-                        {formState.isAvailable ? "Dang phuc vu" : "Tam an"}
+                        {toNumber(formState.preparationTime, 15)} phút -{" "}
+                        {formState.isAvailable ? "Đang phục vụ" : "Tạm ẩn"}
                       </div>
                     </div>
                   </div>
@@ -1095,7 +1163,7 @@ export const AdminProducts = () => {
                     onClick={closeForm}
                     className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    Huy
+                    Hủy
                   </button>
                   <button
                     type="submit"
@@ -1105,7 +1173,7 @@ export const AdminProducts = () => {
                     {saving ? (
                       <LoaderCircle size={16} className="animate-spin" />
                     ) : null}
-                    {editingProductId ? "Cap nhat menu item" : "Luu menu item"}
+                    {editingProductId ? "Cập nhật món" : "Lưu món"}
                   </button>
                 </div>
               </div>

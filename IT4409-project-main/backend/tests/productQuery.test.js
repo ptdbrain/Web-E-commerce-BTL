@@ -13,8 +13,8 @@ test("buildProductFilter maps food query params only", () => {
   });
 
   assert.equal(filter.categorySlug, "burger");
-  assert.equal(filter.itemType, "single");
-  assert.equal(filter.spiceLevel, "medium");
+  assert.deepEqual(filter.itemTypes, ["single"]);
+  assert.deepEqual(filter.spiceLevels, ["medium"]);
   assert.equal(filter.isAvailable, true);
   assert.equal(filter.isFeatured, true);
   assert.ok(filter.searchRegex instanceof RegExp);

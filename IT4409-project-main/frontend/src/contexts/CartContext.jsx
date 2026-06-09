@@ -1,5 +1,4 @@
 import React, {
-  createContext,
   useCallback,
   useEffect,
   useRef,
@@ -22,8 +21,7 @@ import {
   getItemBasePrice,
   mapServerCartItem,
 } from "../utils/cartPayload.js";
-
-export const CartContext = createContext();
+import { CartContext } from "./CartContextBase.js";
 
 const getStoredToken = () => localStorage.getItem("token") || "";
 
@@ -193,43 +191,6 @@ export function CartProvider({ children }) {
     [authToken, applyServerCart]
   );
 
-  const removePurchasedCartItems = useCallback(
-    async (itemsToRemove = []) => {
-      const cartKeys = itemsToRemove
-        .map((item) => item.cartKey)
-        .filter(Boolean);
-
-      if (cartKeys.length === 0) return;
-
-      if (!authToken) {
-        setCartItems((prevItems) =>
-          prevItems.filter((item) => !cartKeys.includes(item.cartKey))
-        );
-        return;
-      }
-
-      let latestCart = null;
-
-      for (const cartKey of cartKeys) {
-        try {
-          latestCart = await removeCartItemRequest(authToken, cartKey);
-        } catch (error) {
-          console.error("Error removing purchased cart item:", error);
-        }
-      }
-
-      if (latestCart) {
-        applyServerCart(latestCart);
-        return;
-      }
-
-      setCartItems((prevItems) =>
-        prevItems.filter((item) => !cartKeys.includes(item.cartKey))
-      );
-    },
-    [authToken, applyServerCart]
-  );
-
   useEffect(() => {
     localStorage.setItem("cartItems", JSON.stringify(cartItems));
   }, [cartItems]);
@@ -326,9 +287,8 @@ export function CartProvider({ children }) {
 
     const timeoutId = setTimeout(async () => {
       try {
-        await axios.post(
-          buildApiUrl(`/payment/zalopay/confirm/${pendingZaloPayOrder.id}`),
-          {},
+        const statusResponse = await axios.get(
+          buildApiUrl(`/payment/zalopay/status/${pendingZaloPayOrder.id}`),
           { headers: { Authorization: `Bearer ${authToken}` } }
         );
 
@@ -339,16 +299,40 @@ export function CartProvider({ children }) {
           ? ordersResponse.data.orders
           : [];
         setOrders(serverOrders.map(mapOrderForState));
+
+        if (statusResponse?.data?.paymentStatus !== "paid") {
+          const statusChecks = Number(pendingZaloPayOrder.statusChecks || 0) + 1;
+          if (statusChecks < 30) {
+            const nextPendingOrder = {
+              ...pendingZaloPayOrder,
+              statusChecks,
+              createdAt: Date.now() - 20000,
+            };
+            setPendingZaloPayOrder(nextPendingOrder);
+            localStorage.setItem(
+              "pendingZaloPayOrder",
+              JSON.stringify(nextPendingOrder)
+            );
+            return;
+          }
+          setPendingZaloPayOrder(null);
+          localStorage.removeItem("pendingZaloPayOrder");
+          return;
+        }
+
+        const syncedCart = await fetchCart(authToken);
+        applyServerCart(syncedCart);
       } catch (error) {
-        console.error("[ZaloPay] Auto confirm error:", error);
-      } finally {
-        setPendingZaloPayOrder(null);
-        localStorage.removeItem("pendingZaloPayOrder");
+        console.error("[ZaloPay] Status check error:", error);
+        return;
       }
+
+      setPendingZaloPayOrder(null);
+      localStorage.removeItem("pendingZaloPayOrder");
     }, remainingTime);
 
     return () => clearTimeout(timeoutId);
-  }, [authToken, pendingZaloPayOrder]);
+  }, [authToken, pendingZaloPayOrder, applyServerCart]);
 
   const addToCart = useCallback(
     async (product) => {
@@ -438,17 +422,17 @@ export function CartProvider({ children }) {
         : cartItems.filter((item) => selectedItemIds.includes(item.cartKey));
 
     if (!formData.name || !formData.phone || selectedItems.length === 0) {
-      alert("Vui long dien thong tin va chon it nhat mot mon.");
+      alert("Vui lòng điền thông tin và chọn ít nhất một món.");
       return;
     }
 
     if (formData.fulfillmentType === "delivery" && !formData.address) {
-      alert("Vui long nhap dia chi giao hang.");
+      alert("Vui lòng nhập địa chỉ giao hàng.");
       return;
     }
 
     if (formData.fulfillmentType === "pickup" && !formData.pickupTime) {
-      alert("Vui long chon gio den lay mon.");
+      alert("Vui lòng chọn giờ đến lấy món.");
       return;
     }
 
@@ -456,12 +440,12 @@ export function CartProvider({ children }) {
       formData.fulfillmentType === "dine_in" &&
       (!formData.bookingTime || !formData.guestCount)
     ) {
-      alert("Vui long nhap gio dat ban va so khach.");
+      alert("Vui lòng nhập giờ đặt bàn và số khách.");
       return;
     }
 
     if (!authToken) {
-      alert("Ban can dang nhap de dat mon.");
+      alert("Bạn cần đăng nhập để đặt món.");
       return;
     }
 
@@ -493,7 +477,11 @@ export function CartProvider({ children }) {
         paymentMethod,
         deliveryFee: pricing.deliveryFee,
         voucherCode: voucherCode || undefined,
-        items: selectedItems.map(buildOrderItemPayload),
+        items: selectedItems.map((item) =>
+          buildOrderItemPayload(item, {
+            includeCartKey: directCheckoutItems.length === 0,
+          })
+        ),
       };
 
       const response = await axios.post(buildApiUrl("/orders"), payload, {
@@ -513,16 +501,13 @@ export function CartProvider({ children }) {
           const pendingOrder = {
             id: createdOrder._id,
             createdAt: Date.now(),
+            statusChecks: 0,
           };
           setPendingZaloPayOrder(pendingOrder);
           localStorage.setItem(
             "pendingZaloPayOrder",
             JSON.stringify(pendingOrder)
           );
-
-          if (directCheckoutItems.length === 0) {
-            await removePurchasedCartItems(selectedItems);
-          }
 
           setSelectedItemIds([]);
           setDirectCheckoutItems([]);
@@ -533,7 +518,7 @@ export function CartProvider({ children }) {
           return;
         }
 
-        alert("Khong tim thay link thanh toan ZaloPay.");
+        alert("Không tìm thấy link thanh toán ZaloPay.");
         return;
       }
 
@@ -543,8 +528,11 @@ export function CartProvider({ children }) {
 
       setOrderSuccess(true);
 
-      if (directCheckoutItems.length === 0) {
-        await removePurchasedCartItems(selectedItems);
+      if (response?.data?.cart) {
+        applyServerCart(response.data.cart);
+      } else if (directCheckoutItems.length === 0) {
+        const syncedCart = await fetchCart(authToken);
+        applyServerCart(syncedCart);
       }
 
       setSelectedItemIds([]);
@@ -559,7 +547,7 @@ export function CartProvider({ children }) {
         setOrderSuccess(false);
       }, 4000);
     } catch (error) {
-      alert(error?.response?.data?.message || "Dat mon that bai");
+      alert(error?.response?.data?.message || "Đặt món thất bại");
     }
   };
 

@@ -2,11 +2,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
 import Cart from "../models/Cart.js";
-import Order from "../models/Order.js";
+import ChatMessage from "../models/ChatMessage.js";
+import ChatSupport from "../models/ChatSupport.js";
+import Order, { EFulfillmentType, EOrderStatus, EPaymentMethod, EPaymentStatus } from "../models/Order.js";
 import Review from "../models/Review.js";
+import User from "../models/user.js";
 import Voucher, { EVoucherDiscountType } from "../models/Voucher.js";
 import { connectRedis, redisClient } from "../config/redis.js";
 import { categories as FOOD_CATEGORIES } from "../../frontend/src/data/categories.js";
@@ -56,14 +60,370 @@ const resetCatalogCollections = async () => {
   await Product.deleteMany({});
   await Category.deleteMany({});
   await Voucher.deleteMany({});
+  await Promise.all([
+    Cart.deleteMany({}),
+    ChatMessage.deleteMany({}),
+    ChatSupport.deleteMany({}),
+    Review.deleteMany({}),
+    Order.deleteMany({}),
+    User.deleteMany({}),
+  ]);
+};
 
-  if (cleanRelated) {
-    await Promise.all([
-      Cart.deleteMany({}),
-      Review.deleteMany({}),
-      Order.deleteMany({}),
-    ]);
+const upsertDemoUser = async ({
+  username,
+  fullname,
+  email,
+  password,
+  role,
+  phoneNumber,
+  addresses,
+}) => {
+  const hashed = await bcrypt.hash(password, 10);
+  const update = {
+    username,
+    fullname,
+    email,
+    role,
+    phoneNumber,
+    addresses,
+    isEmailVerified: true,
+    authProvider: "local",
+  };
+
+  const user = await User.findOne({ username });
+  if (user) {
+    Object.assign(user, update);
+    user.password = hashed;
+    user.refreshToken = undefined;
+    await user.save();
+    return user;
   }
+
+  return User.create({
+    ...update,
+    password: hashed,
+  });
+};
+
+const createDemoUsers = async () => {
+  const reviewerSpecs = [
+    ["khachhang", "Nguyễn Minh Anh", "minhanh@firebite.local", "0900000002", "12 Nguyễn Trãi, Thanh Xuân, Hà Nội"],
+    ["linhpham", "Phạm Gia Linh", "linhpham@firebite.local", "0900000003", "88 Trần Duy Hưng, Cầu Giấy, Hà Nội"],
+    ["hoanganh", "Trần Hoàng Anh", "hoanganh@firebite.local", "0900000004", "24 Láng Hạ, Đống Đa, Hà Nội"],
+    ["thutrang", "Lê Thu Trang", "thutrang@firebite.local", "0900000005", "15 Nguyễn Văn Cừ, Long Biên, Hà Nội"],
+    ["quanghuy", "Đỗ Quang Huy", "quanghuy@firebite.local", "0900000006", "102 Tây Sơn, Đống Đa, Hà Nội"],
+    ["maiphuong", "Ngô Mai Phương", "maiphuong@firebite.local", "0900000007", "36 Phố Huế, Hai Bà Trưng, Hà Nội"],
+    ["ducminh", "Vũ Đức Minh", "ducminh@firebite.local", "0900000008", "71 Hồ Tùng Mậu, Nam Từ Liêm, Hà Nội"],
+    ["baongoc", "Bùi Bảo Ngọc", "baongoc@firebite.local", "0900000009", "19 Kim Mã, Ba Đình, Hà Nội"],
+    ["tuanviet", "Nguyễn Tuấn Việt", "tuanviet@firebite.local", "0900000010", "43 Đại Cồ Việt, Hai Bà Trưng, Hà Nội"],
+    ["hanhnguyen", "Đặng Khánh Hạnh", "hanhnguyen@firebite.local", "0900000011", "9 Trần Thái Tông, Cầu Giấy, Hà Nội"],
+  ];
+
+  const [admin, ...reviewers] = await Promise.all([
+    upsertDemoUser({
+      username: "admin",
+      fullname: "FireBite Admin",
+      email: "admin@firebite.local",
+      password: "Admin@123",
+      role: "admin",
+      phoneNumber: "0900000001",
+      addresses: ["FireBite HQ, Ha Noi"],
+    }),
+    ...reviewerSpecs.map(
+      ([username, fullname, email, phoneNumber, address]) =>
+        upsertDemoUser({
+          username,
+          fullname,
+          email,
+          password: "Customer@123",
+          role: "customer",
+          phoneNumber,
+          addresses: [address],
+        })
+    ),
+  ]);
+
+  return {
+    admin,
+    customer: reviewers[0],
+    customerTwo: reviewers[1],
+    reviewers,
+  };
+};
+
+const toOrderItem = (product, quantity = 1) => {
+  const unitPrice = product.discountPrice ?? product.price;
+  return {
+    productId: product._id,
+    productName: product.name,
+    productImage: product.images?.[0] || "",
+    quantity,
+    price: product.price,
+    unitPrice,
+    lineTotal: unitPrice * quantity,
+    shippingPrice: 0,
+    selectedSize: product.sizes?.find((size) => size.isDefault) || product.sizes?.[0] || undefined,
+    selectedAddons: [],
+    itemNote: "",
+  };
+};
+
+const createDemoCart = async ({ customer, productDocs }) => {
+  const items = [toOrderItem(productDocs[0], 1), toOrderItem(productDocs[6], 2)].map(
+    (item) => ({
+      cartKey: `${item.productId}:default`,
+      productId: item.productId,
+      productName: item.productName,
+      productImage: item.productImage,
+      quantity: item.quantity,
+      selectedSize: item.selectedSize,
+      selectedAddons: item.selectedAddons,
+      itemNote: item.itemNote,
+      basePrice: item.price,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+    })
+  );
+
+  await Cart.findOneAndUpdate(
+    { userId: customer._id },
+    { userId: customer._id, items },
+    { upsert: true, new: true }
+  );
+};
+
+const createDemoOrders = async ({ customer, customerTwo, productDocs, voucherDocs }) => {
+  const firebiteVoucher = voucherDocs.find((voucher) => voucher.code === "FIREBITE15");
+  const orderSpecs = [
+    {
+      customer: customer,
+      status: EOrderStatus.Pending,
+      paymentStatus: EPaymentStatus.Unpaid,
+      fulfillmentType: EFulfillmentType.Delivery,
+      products: [[productDocs[0], 1], [productDocs[3], 1]],
+      deliveryFee: 30000,
+      note: "Không cay, giao sau 18h.",
+    },
+    {
+      customer: customerTwo,
+      status: EOrderStatus.Preparing,
+      paymentStatus: EPaymentStatus.Unpaid,
+      fulfillmentType: EFulfillmentType.Pickup,
+      products: [[productDocs[8], 1], [productDocs[14], 2]],
+      deliveryFee: 0,
+      pickupTime: "18:30",
+      note: "Khách đến lấy tại quầy.",
+    },
+    {
+      customer: customer,
+      status: EOrderStatus.Shipping,
+      paymentStatus: EPaymentStatus.Paid,
+      fulfillmentType: EFulfillmentType.Delivery,
+      products: [[productDocs[20], 1], [productDocs[22], 1]],
+      deliveryFee: 25000,
+      voucher: firebiteVoucher,
+      note: "Đã thanh toán ZaloPay demo.",
+    },
+    {
+      customer: customerTwo,
+      status: EOrderStatus.Confirmed,
+      paymentStatus: EPaymentStatus.Paid,
+      fulfillmentType: EFulfillmentType.DineIn,
+      products: [[productDocs[30], 1], [productDocs[31], 1]],
+      deliveryFee: 0,
+      tableBooking: {
+        guestCount: 2,
+        bookingTime: "19:00",
+        contactNote: "Bàn gần cửa sổ nếu còn.",
+      },
+      note: "Đơn demo đã hoàn tất.",
+    },
+  ];
+
+  const orders = [];
+  for (const spec of orderSpecs) {
+    const items = spec.products.map(([product, quantity]) => toOrderItem(product, quantity));
+    const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+    const originalTotalPrice = subtotal + spec.deliveryFee;
+    const discountAmount = spec.voucher ? Math.min(Math.round(originalTotalPrice * 0.15), 40000) : 0;
+    const totalPrice = originalTotalPrice - discountAmount;
+
+    orders.push(
+      await Order.create({
+        customerId: spec.customer._id,
+        customerName: spec.customer.fullname,
+        customerPhone: spec.customer.phoneNumber,
+        customerEmail: spec.customer.email,
+        items,
+        orderStatus: spec.status,
+        paymentStatus: spec.paymentStatus,
+        paymentMethod:
+          spec.paymentStatus === EPaymentStatus.Paid ? EPaymentMethod.Zalopay : EPaymentMethod.Cash,
+        fulfillmentType: spec.fulfillmentType,
+        shippingAddress:
+          spec.fulfillmentType === EFulfillmentType.Delivery ? spec.customer.addresses[0] : "",
+        pickupTime: spec.pickupTime,
+        tableBooking: spec.tableBooking,
+        note: spec.note,
+        deliveryFee: spec.deliveryFee,
+        totalPrice,
+        originalTotalPrice,
+        discountAmount,
+        voucherCode: spec.voucher?.code,
+        voucherId: spec.voucher?._id,
+        voucherUsageCounted: Boolean(spec.voucher),
+        stockReserved: true,
+        stockReleased: false,
+      })
+    );
+  }
+
+  if (firebiteVoucher) {
+    await Voucher.findByIdAndUpdate(firebiteVoucher._id, { usedCount: 1 });
+  }
+
+  return orders;
+};
+
+const REVIEW_COUNT = 300;
+
+const REVIEW_COMMENTS = [
+  "Món nóng, đóng gói cẩn thận và giao khá nhanh.",
+  "Khẩu phần vừa đủ, gia vị hợp khẩu vị.",
+  "Đồ ăn ngon nhưng hôm nay giao hơi chậm.",
+  "Sốt đậm đà, lần sau mình sẽ gọi thêm.",
+  "Món ổn trong tầm giá, bao bì sạch sẽ.",
+  "Phần ăn nhiều hơn mình nghĩ, rất đáng tiền.",
+  "Hơi mặn với mình nhưng nguyên liệu vẫn tươi.",
+  "Khoai còn giòn, burger không bị nguội.",
+  "Combo tiện và đủ no cho bữa trưa.",
+  "Vị cay vừa phải, ăn khá cuốn.",
+  "Nước uống mát nhưng lượng đá hơi nhiều.",
+  "Món trình bày đẹp, giống hình trên ứng dụng.",
+  "Gà giòn bên ngoài, thịt bên trong không khô.",
+  "Không quá đặc biệt nhưng chất lượng ổn định.",
+  "Mình đặt lại lần hai và chất lượng vẫn tốt.",
+  "Phần sốt hơi ít, nên có thêm lựa chọn mua kèm.",
+  "Nhân viên chuẩn bị đúng ghi chú ít cay.",
+  "Giá hợp lý khi dùng cùng voucher.",
+  "Mùi vị thơm, trẻ nhỏ trong nhà cũng thích.",
+  "Đóng gói chắc chắn, không bị đổ khi nhận.",
+  "Món tạm ổn, mong cửa hàng cải thiện thời gian giao.",
+  "Ăn ngon nhất khi còn nóng, sẽ tiếp tục ủng hộ.",
+  "Kích thước phần ăn đúng mô tả.",
+  "Đồ ăn sạch, vị dễ ăn và không quá dầu.",
+];
+
+const REVIEW_RATINGS = [5, 4, 4, 5, 3, 4, 2, 5, 4, 3, 5, 1];
+
+const recalculateSeededProductRatings = async () => {
+  const aggregates = await Review.aggregate([
+    {
+      $group: {
+        _id: "$product_id",
+        rating: { $avg: "$rating" },
+        numReviews: { $sum: 1 },
+      },
+    },
+  ]);
+
+  if (aggregates.length === 0) return;
+
+  await Product.bulkWrite(
+    aggregates.map((item) => ({
+      updateOne: {
+        filter: { _id: item._id },
+        update: {
+          $set: {
+            rating: Number(item.rating.toFixed(1)),
+            numReviews: item.numReviews,
+          },
+        },
+      },
+    }))
+  );
+};
+
+const createDemoReviews = async ({ reviewers, productDocs }) => {
+  const reviews = [];
+
+  for (let index = 0; index < REVIEW_COUNT; index += 1) {
+    const reviewerIndex = index % reviewers.length;
+    const productIndex =
+      (Math.floor(index / reviewers.length) + reviewerIndex * 7) %
+      productDocs.length;
+    const reviewer = reviewers[reviewerIndex];
+    const product = productDocs[productIndex];
+    const createdAt = new Date(
+      Date.UTC(2026, 5, 8, 12, 0, 0) -
+        ((index * 37) % 180) * 24 * 60 * 60 * 1000 -
+        (index % 24) * 60 * 60 * 1000
+    );
+
+    reviews.push({
+      user_id: reviewer._id,
+      product_id: product._id,
+      userName: reviewer.fullname,
+      userAvatar: reviewer.avatarPicture || "",
+      rating: REVIEW_RATINGS[(index * 5 + productIndex) % REVIEW_RATINGS.length],
+      comment:
+        REVIEW_COMMENTS[
+          (index * 11 + reviewerIndex + productIndex) % REVIEW_COMMENTS.length
+        ],
+      images: [],
+      isVerified: index % 4 !== 0,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  }
+
+  await Review.insertMany(reviews, { ordered: true });
+  await recalculateSeededProductRatings();
+  return reviews.length;
+};
+
+const createDemoChat = async ({ admin, customer, orders }) => {
+  await ChatSupport.findOneAndUpdate(
+    { user: customer._id },
+    { user: customer._id, currentAdmin: admin._id, lastAdmin: admin._id },
+    { upsert: true, new: true }
+  );
+
+  await ChatMessage.insertMany([
+    {
+      user: customer._id,
+      order: orders[0]._id,
+      role: "user",
+      content: "Đơn này có thể giao sau 18h không?",
+      isReadByAdmin: true,
+    },
+    {
+      user: customer._id,
+      order: orders[0]._id,
+      role: "assistant",
+      content: "Được, FireBite sẽ ghi chú giao sau 18h cho đơn của bạn.",
+      isReadByAdmin: true,
+    },
+  ]);
+};
+
+const createDemoOperationalData = async ({ productDocs, voucherDocs }) => {
+  const users = await createDemoUsers();
+  await createDemoCart({ customer: users.customer, productDocs });
+  const orders = await createDemoOrders({
+    customer: users.customer,
+    customerTwo: users.customerTwo,
+    productDocs,
+    voucherDocs,
+  });
+  const reviewCount = await createDemoReviews({
+    reviewers: users.reviewers,
+    productDocs,
+  });
+  await createDemoChat({ admin: users.admin, customer: users.customer, orders });
+
+  return { users, orders, reviewCount };
 };
 
 const createCategories = async () => {
@@ -140,7 +500,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
   return [
     {
       code: "FIREBITE15",
-      description: "Giam 15% toi da 40.000d cho don tu 149.000d.",
+      description: "Giảm 15% tối đa 40.000đ cho đơn từ 149.000đ.",
       discountType: EVoucherDiscountType.Percent,
       discountValue: 15,
       maxDiscountAmount: 40000,
@@ -158,7 +518,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "LUNCH30K",
-      description: "Giam 30.000d cho cac mon lunch-deals tu 119.000d.",
+      description: "Giảm 30.000đ cho các món lunch-deals từ 119.000đ.",
       discountType: EVoucherDiscountType.Amount,
       discountValue: 30000,
       maxDiscountAmount: 0,
@@ -176,7 +536,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "FREESHIP99",
-      description: "Mien phi giao hang cho don delivery tu 99.000d.",
+      description: "Miễn phí giao hàng cho đơn delivery từ 99.000đ.",
       discountType: EVoucherDiscountType.FreeShipping,
       discountValue: 0,
       maxDiscountAmount: 0,
@@ -194,7 +554,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "SWEET10",
-      description: "Giam 10% toi da 25.000d cho desserts va drinks.",
+      description: "Giảm 10% tối đa 25.000đ cho desserts và drinks.",
       discountType: EVoucherDiscountType.Percent,
       discountValue: 10,
       maxDiscountAmount: 25000,
@@ -212,7 +572,7 @@ const buildVoucherDocs = ({ categoryMap, productDocs }) => {
     },
     {
       code: "COMBO25",
-      description: "Giam 25.000d cho cac combo FireBite tu 179.000d.",
+      description: "Giảm 25.000đ cho các combo FireBite từ 179.000đ.",
       discountType: EVoucherDiscountType.Amount,
       discountValue: 25000,
       maxDiscountAmount: 0,
@@ -254,11 +614,15 @@ const main = async () => {
       categoryMap,
       productDocs: insertedProducts,
     });
-    await Voucher.insertMany(voucherDocs, { ordered: true });
+    const insertedVouchers = await Voucher.insertMany(voucherDocs, { ordered: true });
+    const demo = await createDemoOperationalData({
+      productDocs: insertedProducts,
+      voucherDocs: insertedVouchers,
+    });
     await clearRedisProductCache();
 
     console.log(
-      `Seed completed: ${categoryMap.size} categories, ${productDocs.length} products, ${voucherDocs.length} vouchers`
+      `Seed completed: ${categoryMap.size} categories, ${productDocs.length} products, ${voucherDocs.length} vouchers, 11 users, ${demo.orders.length} orders, ${demo.reviewCount} reviews`
     );
   } finally {
     try {
@@ -281,6 +645,7 @@ main()
     console.log(
       "Use `npm run seed:food -- --clean-related` to clear carts, reviews, and orders for a clean demo."
     );
+    console.log("Demo login: admin / Admin@123, khachhang / Customer@123");
     process.exit(0);
   })
   .catch((error) => {

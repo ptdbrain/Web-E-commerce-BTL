@@ -1,18 +1,28 @@
 import axios from "axios";
 import { buildApiUrl } from "../config/api";
 
+const authHeader = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export async function fetchChatHistory() {
-  const res = await axios.get(buildApiUrl("/chat/history"));
+  const res = await axios.get(buildApiUrl("/chat/history"), { headers: authHeader() });
   return Array.isArray(res.data?.messages) ? res.data.messages : [];
 }
 
-export async function sendChatMessage(message) {
-  const res = await axios.post(buildApiUrl("/chat"), { message });
+export async function sendChatMessage(message, options = {}) {
+  const payload = { message };
+  if (options.orderId) {
+    payload.orderId = options.orderId;
+  }
+
+  const res = await axios.post(buildApiUrl("/chat"), payload, { headers: authHeader() });
   return res.data?.message || null;
 }
 
 export async function fetchSupportStatus() {
-  const res = await axios.get(buildApiUrl("/chat/support-status"));
+  const res = await axios.get(buildApiUrl("/chat/support-status"), { headers: authHeader() });
   return res.data || { currentAdmin: null, lastAdmin: null };
 }
 

@@ -4,7 +4,11 @@ import Category from "../models/Category.js";
 import cloudinary from "../config/cloudinary.js";
 import { redisClient } from "../config/redis.js";
 import { normalizeMenuProductPayload } from "../utils/menuDomain.js";
-import { buildProductFilter } from "../utils/productQuery.js";
+import { normalizeProductImageUrls } from "../utils/productImages.js";
+import {
+  buildProductFilter,
+  buildProductVisibilityFilter,
+} from "../utils/productQuery.js";
 
 const PRODUCT_CACHE_KEY = "products:all";
 const BESTSELLER_CACHE_KEY = "products:bestsellers";
@@ -17,6 +21,7 @@ const uploadBufferToCloudinary = async (fileBuffer, mimetype) => {
   return res.secure_url;
 };
 
+// Xóa toàn bộ cache sản phẩm sau mỗi thao tác tạo/sửa/xóa để dữ liệu luôn mới nhất
 const clearProductsCache = async () => {
   if (!redisClient || !redisClient.isOpen) return;
   if (typeof redisClient.keys === "function") {
@@ -29,18 +34,35 @@ const clearProductsCache = async () => {
   }
 };
 
+const escapeRegExp = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const resolveCategoryId = async (category) => {
   if (!category) return undefined;
   if (mongoose.Types.ObjectId.isValid(category)) return category;
 
+  const categoryPattern = escapeRegExp(category);
   const found = await Category.findOne({
     $or: [
-      { name: { $regex: `^${category}$`, $options: "i" } },
-      { slug: { $regex: `^${category}$`, $options: "i" } },
+      { name: { $regex: `^${categoryPattern}$`, $options: "i" } },
+      { slug: { $regex: `^${categoryPattern}$`, $options: "i" } },
     ],
+    isActive: { $ne: false },
   });
 
   return found?._id;
+};
+
+const validateProductPayload = (payload = {}) => {
+  if (!payload.name) return "Product name is required";
+  if (!payload.slug) return "Product slug is required";
+  if (!Number.isFinite(payload.price) || payload.price <= 0) {
+    return "Product price must be greater than 0";
+  }
+  if (!Number.isFinite(payload.stock) || payload.stock < 0) {
+    return "Product stock cannot be negative";
+  }
+  return null;
 };
 
 const uploadImages = async (files = []) => {
@@ -65,7 +87,16 @@ const uploadImages = async (files = []) => {
 export const createProduct = async (req, res) => {
   try {
     const normalized = normalizeMenuProductPayload(req.body);
-    const images = await uploadImages(req.files || []);
+    const validationError = validateProductPayload(normalized);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
+    const uploadedImages = await uploadImages(req.files || []);
+    const imageUrls = normalizeProductImageUrls(
+      req.body.imageUrls ?? req.body.images
+    );
+    const images = [...imageUrls, ...uploadedImages].slice(0, 6);
     const category = await resolveCategoryId(req.body.category);
 
     if (!category) {
@@ -111,10 +142,29 @@ export const createProduct = async (req, res) => {
 
 const SORT_MAP = {
   newest:     { createdAt: -1 },
-  price_asc:  { discountPrice: 1 },
-  price_desc: { discountPrice: -1 },
+  price_asc:  { price: 1 },
+  price_desc: { price: -1 },
   rating:     { rating: -1 },
   bestseller: { soldCount: -1 },
+};
+
+const getEffectivePrice = (product = {}) => {
+  const discountPrice = Number(product.discountPrice);
+  if (Number.isFinite(discountPrice) && discountPrice >= 0) return discountPrice;
+  const price = Number(product.price);
+  return Number.isFinite(price) ? price : 0;
+};
+
+const sortProductsForResponse = (products = [], sortBy = "newest") => {
+  if (sortBy === "price_asc") {
+    return [...products].sort((left, right) => getEffectivePrice(left) - getEffectivePrice(right));
+  }
+
+  if (sortBy === "price_desc") {
+    return [...products].sort((left, right) => getEffectivePrice(right) - getEffectivePrice(left));
+  }
+
+  return products;
 };
 
 export const getProducts = async (req, res) => {
@@ -126,9 +176,14 @@ export const getProducts = async (req, res) => {
 
     const skip = (page - 1) * limit;
     const sortOrder = SORT_MAP[sortBy] ?? SORT_MAP.newest;
+    const includeInactive =
+      req.includeInactiveProducts === true ||
+      (req.query.includeInactive === "true" && req.user?.role === "admin");
 
     // Build base filter (common to all query branches)
-    const baseFilter = {};
+    const baseFilter = {
+      ...buildProductVisibilityFilter({ includeInactive, isAvailable }),
+    };
 
     if (categorySlug) {
       const cat = await Category.findOne({
@@ -143,13 +198,14 @@ export const getProducts = async (req, res) => {
 
     if (spiceLevels.length === 1)   baseFilter.spiceLevel  = spiceLevels[0];
     else if (spiceLevels.length > 1) baseFilter.spiceLevel = { $in: spiceLevels };
-    if (isAvailable !== undefined) baseFilter.isAvailable = isAvailable;
     if (isFeatured) baseFilter.$or = [{ isBestSeller: true }, { isNew: true }];
 
     if (minPrice !== undefined || maxPrice !== undefined) {
-      baseFilter.discountPrice = {};
-      if (minPrice !== undefined) baseFilter.discountPrice.$gte = minPrice;
-      if (maxPrice !== undefined) baseFilter.discountPrice.$lte = maxPrice;
+      const priceClauses = [];
+      const effectivePrice = { $ifNull: ["$discountPrice", "$price"] };
+      if (minPrice !== undefined) priceClauses.push({ $gte: [effectivePrice, minPrice] });
+      if (maxPrice !== undefined) priceClauses.push({ $lte: [effectivePrice, maxPrice] });
+      baseFilter.$expr = priceClauses.length === 1 ? priceClauses[0] : { $and: priceClauses };
     }
 
     // Search path: $text (với index) + fallback regex + merge category-name matches
@@ -198,9 +254,10 @@ export const getProducts = async (req, res) => {
         }
       }
 
-      const total = merged.length;
+      const sorted = sortProductsForResponse(merged, sortBy);
+      const total = sorted.length;
       return res.json({
-        data: merged.slice(skip, skip + limit),
+        data: sorted.slice(skip, skip + limit),
         total,
         page,
         totalPages: Math.ceil(total / limit) || 0,
@@ -210,7 +267,7 @@ export const getProducts = async (req, res) => {
     // Không có search → query thuần với filter + sort + pagination
     const isFiltered = Object.keys(baseFilter).length > 0;
 
-    if (!isFiltered) {
+    if (!isFiltered && !includeInactive) {
       // Cache theo từng sort order (key khác nhau tránh trả sai thứ tự)
       const cacheKey = `${PRODUCT_CACHE_KEY}:${sortBy}`;
       if (redisClient && redisClient.isOpen) {
@@ -226,7 +283,13 @@ export const getProducts = async (req, res) => {
         }
       }
 
-      const all = await Product.find().sort(sortOrder).populate("category", "name slug").lean();
+      const all = sortProductsForResponse(
+        await Product.find(baseFilter)
+          .sort(sortOrder)
+          .populate("category", "name slug")
+          .lean(),
+        sortBy
+      );
 
       if (redisClient && redisClient.isOpen) {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(all));
@@ -240,22 +303,44 @@ export const getProducts = async (req, res) => {
       });
     }
 
+    if (!isFiltered) {
+      const all = sortProductsForResponse(
+        await Product.find(baseFilter)
+          .sort(sortOrder)
+          .populate("category", "name slug")
+          .lean(),
+        sortBy
+      );
+
+      return res.json({
+        data: all.slice(skip, skip + limit),
+        total: all.length,
+        page,
+        totalPages: Math.ceil(all.length / limit),
+      });
+    }
+
     // Query có filter: dùng countDocuments + find song song
-    const [total, data] = await Promise.all([
-      Product.countDocuments(baseFilter),
-      Product.find(baseFilter)
+    const filtered = sortProductsForResponse(
+      await Product.find(baseFilter)
         .sort(sortOrder)
-        .skip(skip)
-        .limit(limit)
         .populate("category", "name slug")
         .lean(),
-    ]);
+      sortBy
+    );
+    const total = filtered.length;
+    const data = filtered.slice(skip, skip + limit);
 
     return res.json({ data, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error("getProducts error", err);
     return res.status(500).json({ message: "Error fetching products" });
   }
+};
+
+export const getAdminProducts = async (req, res) => {
+  req.includeInactiveProducts = true;
+  return getProducts(req, res);
 };
 
 export const getProductById = async (req, res) => {
@@ -266,7 +351,11 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const product = await Product.findById(id)
+    const product = await Product.findOne({
+      _id: id,
+      isActive: { $ne: false },
+      isAvailable: { $ne: false },
+    })
       .populate("category", "name slug")
       .lean();
 
@@ -286,7 +375,11 @@ export const getFeaturedProducts = async (req, res) => {
     const ids = String(req.query.ids || "")
       .split(",")
       .filter(Boolean);
-    const products = await Product.find({ _id: { $in: ids } })
+    const products = await Product.find({
+      _id: { $in: ids },
+      isActive: { $ne: false },
+      isAvailable: { $ne: false },
+    })
       .populate("category", "name slug")
       .lean();
     res.json(products);
@@ -385,7 +478,15 @@ export const updateProduct = async (req, res) => {
       ...product.toObject(),
       ...req.body,
     });
+    const validationError = validateProductPayload(normalized);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
+    }
+
     const category = await resolveCategoryId(req.body.category);
+    if (Object.prototype.hasOwnProperty.call(req.body, "category") && !category) {
+      return res.status(400).json({ message: "Category is required" });
+    }
 
     product.name = normalized.name;
     product.slug = normalized.slug;
@@ -412,9 +513,17 @@ export const updateProduct = async (req, res) => {
     if (category !== undefined) product.category = category;
     if (req.body.category === "") product.category = undefined;
 
-    const images = await uploadImages(req.files || []);
-    if (images.length) {
-      product.images = images;
+    const uploadedImages = await uploadImages(req.files || []);
+    const hasImageUrlPayload = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "imageUrls"
+    );
+    const imageUrls = normalizeProductImageUrls(
+      req.body.imageUrls ?? req.body.images
+    );
+    const nextImages = [...imageUrls, ...uploadedImages].slice(0, 6);
+    if (hasImageUrlPayload || uploadedImages.length) {
+      product.images = nextImages;
     }
 
     await product.save();
@@ -433,11 +542,15 @@ export const updateProduct = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Product.findByIdAndDelete(id);
+    const deleted = await Product.findByIdAndUpdate(
+      id,
+      { isActive: false, isAvailable: false },
+      { new: true }
+    );
     if (!deleted) return res.status(404).json({ message: "Product not found" });
 
     await clearProductsCache();
-    return res.json({ message: "Product deleted", id: deleted._id });
+    return res.json({ message: "Product hidden", id: deleted._id, product: deleted });
   } catch (err) {
     console.error("deleteProduct error", err);
     return res.status(500).json({ message: "Error deleting product" });
